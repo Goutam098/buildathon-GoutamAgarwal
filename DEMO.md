@@ -53,16 +53,26 @@ Set the thali quantity to 6. Click **Complete sale**.*
 *Scroll the flagged bill. Call out, in this order:*
 
 - **Narayan Steel Agency** has no supplier ledger.
-- The **GSTIN came back 16 characters** — the model misread a blurred letter, and our
-  format check caught the model's own mistake. *(This is the line judges remember.)*
+- The **GSTIN came back wrong**. Read out whatever the screen actually shows, then say:
+  *"Fifteen characters, perfectly formatted, and not this supplier. A format check passes
+  that. So we check the GST check digit — the last character is a checksum over the other
+  fourteen, and it breaks on any single misread character. It caught the model's own
+  mistake."* **(This is the line judges remember.)**
+
+  The exact wrong string differs run to run — sometimes it breaks the format, sometimes
+  only the checksum. Both are caught; don't promise a specific string on camera.
 - **"SS Box 2 Ltr"** is probably "Steel Container 2 Litre", 67% confident — confirm it.
 - **"Tadka Pan Small"** is probably "Tadka Pan 10 cm", 78% — confirm it.
 - The bill says **₹48,609**; the lines plus 5% GST come to **₹48,069**. A transposed
   digit. That is the exact error a tired human copies straight into the books.
 
-*Click **Create new** for the supplier, pick the two suggested stock items.*
+*Click **Create new** for the supplier. Pick the two suggested stock items. In the GSTIN
+box type `08NARAY7531V1ZN` (what the bill actually prints — click the thumbnail to show
+it). Correct the total to `48069`.*
 
-> Twenty seconds of attention on four specific things, instead of re-typing the bill.
+> Twenty seconds of attention on five specific things, instead of re-typing the bill.
+> And notice: fixing the supplier didn't release it. Every check re-runs on every
+> correction, so repairing one thing can never hide the next.
 
 *Click **Approve & add to stock**.*
 

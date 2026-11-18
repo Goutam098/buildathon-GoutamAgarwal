@@ -120,7 +120,7 @@ scripted one:
 | Check | What it found |
 |---|---|
 | Supplier not in masters | "Narayan Steel Agency" has no creditor ledger — map it or create it |
-| GSTIN format | The model misread the blurred GSTIN as 16 characters. **Our format check caught the model's own mistake**, which is the whole argument for not letting it decide anything |
+| GSTIN | The blurred GSTIN comes back **wrong, but plausible**. One real run returned `08ANARJ7531V1Z5` against `08NARAY7531V1ZN` printed — fifteen characters, correct shape, different business. A format check passes that, so we validate the **GST check digit** (a mod-36 checksum over the first 14 characters), which breaks on any single wrong character 35 times out of 36. **This catches the model's own mistake**, and it is the whole argument for not letting it decide anything |
 | Low-confidence item | "SS Box 2 Ltr" is probably "Steel Container 2 Litre" (67%) — confirm |
 | Low-confidence item | "Tadka Pan Small" is probably "Tadka Pan 10 cm" (78%) — confirm |
 | Arithmetic | Bill says ₹48,609; lines + 5% GST come to ₹48,069. Off by ₹540 — a transposed digit, exactly the error a tired human makes and then copies into Tally |
@@ -193,7 +193,8 @@ wifi dies mid-demo.
 - Stock **increasing** when a purchase is approved.
 - Reversal: cancel a posting, units go back exactly once, voucher stays in history as void.
 - Downloads that open: Tally XML, a three-sheet Excel review workbook, a stock CSV.
-- 30 engine checks: `cd web && npx tsx scripts/check-engine.ts`.
+- 56 engine checks: `cd web && npx tsx scripts/check-engine.ts` (the script prints its
+  own count, so this number cannot drift out of date).
 
 **Export-only — generated correctly, not pushed into live software:**
 
@@ -218,6 +219,46 @@ Validate the XML against a live Tally Prime, add the purchase path, learn each s
 naming habits from the corrections it is given (today the aliases are hand-written; they
 should be earned), and a read-only Tally connection so the owner can ask the books
 questions instead of clicking through reports.
+
+## Testing both workflows yourself
+
+```bash
+cd web && npx tsx scripts/check-engine.ts
+```
+
+56 checks, no browser, server or API key needed — all the logic lives in `src/lib/`.
+They cover matching, size conflicts, arithmetic, tax heads, GSTIN check digits,
+correction replay, both posting directions and the generated XML.
+
+To exercise the app by hand, with the dev server running:
+
+1. **Reset day** (top right). Steel Thali 11 inch should read 120.
+2. **A sale:** pick a customer, search `thali`, click the result, **Complete sale**.
+   Watch the stock panel drop to 119 and a voucher appear.
+3. **A purchase:** switch to *Bills from suppliers* → **Run tonight's batch**. One bill
+   posts clean; the other is held with four or five flags.
+4. **Correct it:** create the supplier, confirm the two suggested stock items, fix the
+   GSTIN if flagged, correct the total to `48069`. Then **Approve & add to stock** and
+   watch the thali count jump.
+5. **Duplicates:** press **Run tonight's batch** again. The same invoice numbers are
+   refused rather than posted twice.
+6. **Reversal:** press **Reverse this posting** on any posted card. The units go back
+   exactly once and the voucher stays in history as void.
+7. **Downloads:** all three buttons in the right rail produce real files.
+
+No API key? Tick **Offline mode** before step 3 — the two sample bills have committed
+cached reads in `web/data/cache/`, so the whole flow works without a network.
+
+## Reading the code
+
+| Document | For |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How it is built, folder by folder, written for a non-developer |
+| [PITCH.md](PITCH.md) | How to explain it in 15 seconds, in a minute, and in depth — plus judge Q&A |
+| [DEMO.md](DEMO.md) | The two-minute recording script |
+
+Start with `web/src/lib/engine.ts`. It is the file that decides what is true, and it has
+no web code in it at all.
 
 ---
 
