@@ -55,9 +55,19 @@ export type Computed = {
   supply: "intra" | "inter" | "unknown";
 };
 
+/** Decisions a human made on the review screen. Replayed on every recompute. */
+export type Overrides = {
+  partyLedgerId?: string | null;
+  createPartyAsNew?: boolean;
+  lineItems?: Record<string, string>; // line index -> stock item id
+  edits?: Partial<ExtractedInvoice>; // corrected figures
+};
+
 export type ReviewInvoice = {
   id: string;
   fileName: string;
+  overrides?: Overrides;
+  isNewLedger?: boolean;
   imageUrl?: string;
   extraction: ExtractedInvoice;
   partyLedgerId: string | null;
