@@ -2,6 +2,10 @@
 
 **Track 1 — Build for the Physical World** · Buildathon, Masters' Union, 18 Nov 2026
 
+> **A retailer should never have to enter the same transaction twice.**
+> A purchase arrives as a supplier's document. A sale originates at the counter. Both
+> should become accurate stock and accounting records on their own.
+
 Every night, after the shutter comes down, somebody retypes the day's bills into Tally.
 
 **Half of that paper should never have existed.** If the shop rings up its own sales on a
@@ -75,42 +79,54 @@ dinner, every night, for the rest of his working life.
 
 ## What we built
 
-A local web application. The shop's API key stays server-side; nothing leaves the
-owner's machine except the bill images sent to Claude for transcription.
+A local web application with two ways in and one way out. The API key stays server-side;
+nothing leaves the owner's machine except the supplier bill images sent for transcription.
 
 ```
-bill photo ──► Claude (transcribe only) ──► match to this shop's masters
-                                               │
-                                        recompute the arithmetic
-                                               │
-                        ┌──────────────────────┴───────────────────┐
-                   everything agrees                        something is off
-                        │                                          │
-                 ready to post                          flagged for a human
-                        │                                          │
-                        └──────────► approve ◄─────────────────────┘
-                                        │
-                      stock moves · Tally XML · Excel · stock CSV
+  A. COUNTER SALE                        B. SUPPLIER BILL
+  search catalogue                       photo or PDF dropped in
+  cart, qty, price                              │
+  confirm payment                        model transcribes it
+        │                                       │
+   nothing to read                       match to this shop's masters
+        │                                       │
+        └───────────────┬───────────────────────┘
+                        │
+            recompute the arithmetic, check the tax heads,
+            check for duplicates, score every match
+                        │
+         ┌──────────────┴──────────────┐
+    everything agrees            something is off
+         │                             │
+    posts itself              flagged for a human
+         │                             │
+         └────────► approve ◄──────────┘
+                        │
+        stock OUT (sale) / stock IN (purchase)
+        Tally XML · Excel review sheet · stock CSV
 ```
 
-**The model only reads.** It is instructed never to calculate, correct or round, and to
-transcribe a wrong figure exactly as printed. Every judgement after that happens in
-plain, inspectable TypeScript, because a number a model invented would become a silent
-error in somebody's books.
+**Where the model is used, it only reads.** It is instructed never to calculate, correct
+or round, and to transcribe a wrong figure exactly as printed. Every judgement after that
+happens in plain, inspectable TypeScript, because a number a model invented would become
+a silent error in somebody's books. On the sales side the model is not used at all.
 
 ### What it catches
 
-Run the two sample bills and the second one fails five different ways, on purpose:
+Sample bill 1 (Jindal Steel Udyog) is clean and posts straight through. Sample bill 2 —
+a tilted, slightly blurred phone photo — is held back, and this is a real run, not a
+scripted one:
 
-| Check | What it finds on sample bill 2 |
+| Check | What it found |
 |---|---|
-| Party not in masters | "Shagun Crockery Mart" has no ledger — map it or create it |
-| Low-confidence item | "SS Box 2 Ltr" is probably "Steel Container 2 Litre" — confirm |
-| Low-confidence item | "Tadka Pan Small" is probably "Tadka Pan 10 cm" — confirm |
-| Arithmetic | Bill says ₹51,540; lines + 5% GST come to ₹51,450. Off by ₹90 |
-| Stock | Selling 200 thalis against 120 in stock — stock would go negative |
+| Supplier not in masters | "Narayan Steel Agency" has no creditor ledger — map it or create it |
+| GSTIN format | The model misread the blurred GSTIN as 16 characters. **Our format check caught the model's own mistake**, which is the whole argument for not letting it decide anything |
+| Low-confidence item | "SS Box 2 Ltr" is probably "Steel Container 2 Litre" (67%) — confirm |
+| Low-confidence item | "Tadka Pan Small" is probably "Tadka Pan 10 cm" (78%) — confirm |
+| Arithmetic | Bill says ₹48,609; lines + 5% GST come to ₹48,069. Off by ₹540 — a transposed digit, exactly the error a tired human makes and then copies into Tally |
 
-Sample bill 1 is clean and posts straight through. That contrast *is* the demo.
+That contrast *is* the demo. One bill needed nobody. The other needed about twenty
+seconds of a human's attention, on four specific things, instead of a full re-typing.
 
 Other checks in the engine: duplicate invoice numbers (across the day and within one
 batch), CGST/SGST vs IGST against the place of supply, CGST ≠ SGST on an intra-state
@@ -145,8 +161,12 @@ cd web && npm install
 ```
 
 ```bash
-cp .env.example .env.local   # then put your Anthropic API key in it
+cp .env.example .env.local
 ```
+
+Put **one** key in `.env.local` — either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. The
+reading step is the only vendor-specific part of the system; everything that decides what
+goes into the books is ours. This build was demonstrated on OpenAI (`gpt-4o`).
 
 ```bash
 npm run dev
@@ -158,19 +178,39 @@ Every successful read is cached by file hash in `web/data/cache/`, so a second r
 instant. **Offline mode** forces the cache, which is also the fallback if the API or the
 wifi dies mid-demo.
 
-## Real vs simulated
+## Real vs simulated — precisely
 
-**Real:** the Claude transcription, the matching engine, every validation rule, the
-confidence scoring, the stock deduction, and all three export files. The XML is generated
-to Tally's documented import schema and you can open it.
+**Actually working, end to end, in the app:**
 
-**Simulated:** the shop. The ledgers, stock items, bills, GSTINs and the business itself
-are invented sample data — no real client's books appear anywhere in this repo.
+- Counter billing: catalogue search, cart, editable quantity and price, GST, confirm.
+- Stock **decreasing** on a confirmed sale, in the same database the purchases use.
+- Supplier bill upload → real API call → structured transcription (~4s a bill).
+- Matching of suppliers, customers and stock items with calibrated confidence scores.
+- Validation: line arithmetic, taxable total, GST amount, CGST/SGST vs IGST against place
+  of supply, GSTIN format, duplicate invoice numbers across the day and within a batch.
+- Human review: map to an existing ledger, create a new one, confirm a suggested stock
+  item, correct a figure. Every fix re-runs the whole resolution.
+- Stock **increasing** when a purchase is approved.
+- Reversal: cancel a posting, units go back exactly once, voucher stays in history as void.
+- Downloads that open: Tally XML, a three-sheet Excel review workbook, a stock CSV.
+- 30 engine checks: `cd web && npx tsx scripts/check-engine.ts`.
 
-**Not done:** we have not pushed the XML into a running Tally Prime instance, so we are
-not claiming one-click import. The schema is right; the install needs verifying. Purchase
-bills use the same pipeline but we built and tested the sales path. Handwritten bills are
-untested.
+**Export-only — generated correctly, not pushed into live software:**
+
+- The Tally XML is written to Tally's documented import schema and you can read every
+  voucher in it. We have **not** imported it into a running Tally Prime instance, so we do
+  not claim one-click import. That is the next thing to verify, not something we are
+  asserting.
+
+**Simulated:**
+
+- The shop itself. Ledgers, stock items, suppliers, customers, GSTINs and both sample
+  bills are invented. No real business or client data appears anywhere in this repo.
+- Payment is a confirmation step, not a real payment gateway.
+
+**Not built:** customer accounts, a payment gateway, a second inventory product's import
+format, purchase order matching, handwritten bills (untested), and the read-only Tally
+query connection.
 
 ## Next
 
