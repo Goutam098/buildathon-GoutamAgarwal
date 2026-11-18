@@ -6,7 +6,7 @@
 
 export const SHOP = {
   name: "Shree Balaji Steel House",
-  gstin: "08ABCDE1234F1Z5",
+  gstin: "08ABCDE1234F1Z0",
   stateCode: "08",
   state: "Rajasthan",
   address: "Shop 14-A, Kishanpole Bazar, Jaipur, Rajasthan 302003",
@@ -50,17 +50,17 @@ export const STOCK_ITEMS: StockItem[] = [
 ];
 
 export const LEDGERS: Ledger[] = [
-  { id: "LD-001", name: "Maheshwari Bhandar", aliases: ["maheshwari bhandaar"], gstin: "08MNOPQ9876R1Z4", group: "Sundry Debtors", stateCode: "08" },
-  { id: "LD-002", name: "Krishna Steel Traders", aliases: ["krishna steel"], gstin: "08KLMNO4321P1Z9", group: "Sundry Debtors", stateCode: "08" },
-  { id: "LD-003", name: "Gopal Ghar Grihasti", aliases: ["gopal grihasti"], gstin: "08GHIJK2468L1Z3", group: "Sundry Debtors", stateCode: "08" },
-  { id: "LD-004", name: "Rajasthan Crockery Depot", aliases: ["rajasthan crockery"], gstin: "08DEFGH1357M1Z7", group: "Sundry Debtors", stateCode: "08" },
-  { id: "LD-005", name: "Bhandari Kitchen World", aliases: ["bhandari kitchen"], gstin: "08BCDEF8642N1Z1", group: "Sundry Debtors", stateCode: "08" },
-  { id: "LD-006", name: "Agarwal Utensils Mart", aliases: ["agarwal utensils"], gstin: "09ABCDE9753Q1Z8", group: "Sundry Debtors", stateCode: "09" },
+  { id: "LD-001", name: "Maheshwari Bhandar", aliases: ["maheshwari bhandaar"], gstin: "08MNOPQ9876R1Z1", group: "Sundry Debtors", stateCode: "08" },
+  { id: "LD-002", name: "Krishna Steel Traders", aliases: ["krishna steel"], gstin: "08KLMNO4321P1ZD", group: "Sundry Debtors", stateCode: "08" },
+  { id: "LD-003", name: "Gopal Ghar Grihasti", aliases: ["gopal grihasti"], gstin: "08GHIJK2468L1Z2", group: "Sundry Debtors", stateCode: "08" },
+  { id: "LD-004", name: "Rajasthan Crockery Depot", aliases: ["rajasthan crockery"], gstin: "08DEFGH1357M1ZS", group: "Sundry Debtors", stateCode: "08" },
+  { id: "LD-005", name: "Bhandari Kitchen World", aliases: ["bhandari kitchen"], gstin: "08BCDEF8642N1ZU", group: "Sundry Debtors", stateCode: "08" },
+  { id: "LD-006", name: "Agarwal Utensils Mart", aliases: ["agarwal utensils"], gstin: "09ABCDE9753Q1ZN", group: "Sundry Debtors", stateCode: "09" },
 
   // Suppliers. Purchase bills are matched against these, never against customers.
-  { id: "LD-101", name: "Jindal Steel Udyog", aliases: ["jindal udyog", "jindal steel"], gstin: "08JKLMN3579S1Z2", group: "Sundry Creditors", stateCode: "08" },
-  { id: "LD-102", name: "Suraj Metal Works", aliases: ["suraj metals"], gstin: "08SURAJ2468T1Z6", group: "Sundry Creditors", stateCode: "08" },
-  { id: "LD-103", name: "Hindustan Kitchenware Co", aliases: ["hindustan kitchenware"], gstin: "24HINDU1593U1Z4", group: "Sundry Creditors", stateCode: "24" },
+  { id: "LD-101", name: "Jindal Steel Udyog", aliases: ["jindal udyog", "jindal steel"], gstin: "08JKLMN3579S1ZW", group: "Sundry Creditors", stateCode: "08" },
+  { id: "LD-102", name: "Suraj Metal Works", aliases: ["suraj metals"], gstin: "08SURAJ2468T1ZU", group: "Sundry Creditors", stateCode: "08" },
+  { id: "LD-103", name: "Hindustan Kitchenware Co", aliases: ["hindustan kitchenware"], gstin: "24HINDU1593U1ZK", group: "Sundry Creditors", stateCode: "24" },
 ];
 
 export const DEBTORS = LEDGERS.filter((l) => l.group === "Sundry Debtors");

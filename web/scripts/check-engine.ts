@@ -9,7 +9,7 @@
  *   npx tsx scripts/check-engine.ts
  */
 import { STOCK_ITEMS } from "../src/lib/masters";
-import { similarity } from "../src/lib/engine";
+import { gstinIsValid, similarity } from "../src/lib/engine";
 import { buildInvoice } from "../src/lib/review";
 import { buildTallyXml } from "../src/lib/tally";
 import type { ExtractedInvoice } from "../src/lib/types";
@@ -18,8 +18,10 @@ const stock: Record<string, number> = {};
 for (const s of STOCK_ITEMS) stock[s.id] = s.openingQty;
 
 let failed = 0;
+let passed = 0;
 function check(label: string, cond: boolean, detail = "") {
   if (cond) {
+    passed++;
     console.log(`  ok    ${label}`);
   } else {
     failed++;
@@ -33,9 +35,9 @@ const BILL_1: ExtractedInvoice = {
   invoiceNumber: "SBS/25-26/0412",
   invoiceDate: "18-11-2026",
   partyName: "Maheshwari Bhandar",
-  partyGstin: "08MNOPQ9876R1Z4",
+  partyGstin: "08MNOPQ9876R1Z1",
   supplierName: "SHREE BALAJI STEEL HOUSE",
-  supplierGstin: "08ABCDE1234F1Z5",
+  supplierGstin: "08ABCDE1234F1Z0",
   lines: [
     { description: "Steel Thali 11 inch", hsn: "7323", qty: 48, unit: "PCS", rate: 185, amount: 8880 },
     { description: "SS Water Bottle 1 Litre", hsn: "7323", qty: 24, unit: "PCS", rate: 240, amount: 5760 },
@@ -54,9 +56,9 @@ const BILL_2: ExtractedInvoice = {
   invoiceNumber: "SBS/25-26/0413",
   invoiceDate: "18-11-2026",
   partyName: "Shagun Crockery Mart",
-  partyGstin: "08QRSTU5678K1Z2",
+  partyGstin: "08QRSTU5678K1ZV",
   supplierName: "SHREE BALAJI STEEL HOUSE",
-  supplierGstin: "08ABCDE1234F1Z5",
+  supplierGstin: "08ABCDE1234F1Z0",
   lines: [
     { description: "SS Box 2 Ltr", hsn: "7323", qty: 30, unit: "PCS", rate: 310, amount: 9300 },
     { description: "Tadka Pan Small", hsn: "7323", qty: 18, unit: "PCS", rate: 150, amount: 2700 },
@@ -153,9 +155,9 @@ const PURCHASE: ExtractedInvoice = {
   invoiceNumber: "JSU/2026-27/1184",
   invoiceDate: "18-11-2026",
   partyName: "Shree Balaji Steel House", // billed TO us
-  partyGstin: "08ABCDE1234F1Z5",
+  partyGstin: "08ABCDE1234F1Z0",
   supplierName: "Jindal Steel Udyog", // issued BY them
-  supplierGstin: "08JKLMN3579S1Z2",
+  supplierGstin: "08JKLMN3579S1ZW",
   lines: [
     { description: "Steel Thali 11 inch", hsn: "7323", qty: 100, unit: "PCS", rate: 142, amount: 14200 },
     { description: "Kadhai 24 cm Heavy Base", hsn: "7323", qty: 30, unit: "PCS", rate: 338, amount: 10140 },
@@ -190,7 +192,7 @@ check("a large purchase is not a stock shortfall",
 
 // A customer must never satisfy a supplier lookup, or money lands in the wrong ledger.
 const wrongPool = buildInvoice(
-  { ...PURCHASE, supplierName: "Maheshwari Bhandar", supplierGstin: "08MNOPQ9876R1Z4" },
+  { ...PURCHASE, supplierName: "Maheshwari Bhandar", supplierGstin: "08MNOPQ9876R1Z1" },
   { id: "pur-3", fileName: "pur-3.png", stock, seenInvoiceNumbers: [], direction: "purchase" },
 );
 check("a customer cannot be matched as a supplier",
@@ -203,5 +205,100 @@ check("supplier is credited (positive, not deemed positive)",
 check("purchase ledger is debited", pxml.includes("Purchase - Local 5%") && pxml.includes("<AMOUNT>-14200.00</AMOUNT>"));
 check("input GST, not output", pxml.includes("Input CGST 2.5%") && !pxml.includes("Output CGST"));
 
-console.log(failed ? `\n${failed} check(s) failed\n` : "\nAll checks passed\n");
+/* --- 7. the actual sample bill shipped in web/public/samples ------------ */
+console.log("\nSample bill 2 (purchase-invoice-2.png), exactly as printed");
+
+// These are the figures printed on the bill the demo uploads. The grand total
+// is deliberately transposed: 48,609 printed against 48,069 computed.
+const SAMPLE_2: ExtractedInvoice = {
+  invoiceNumber: "NSA/26-27/0912",
+  invoiceDate: "18-11-2026",
+  partyName: "Shree Balaji Steel House",
+  partyGstin: "08ABCDE1234F1Z0",
+  supplierName: "Narayan Steel Agency",
+  supplierGstin: "08NARAY7531V1ZN",
+  lines: [
+    { description: "SS Box 2 Ltr", hsn: "7323", qty: 80, unit: "PCS", rate: 236, amount: 18880 },
+    { description: "Tadka Pan Small", hsn: "7323", qty: 50, unit: "PCS", rate: 112, amount: 5600 },
+    { description: "Steel Thali 11 inch", hsn: "7323", qty: 150, unit: "PCS", rate: 142, amount: 21300 },
+  ],
+  taxableValue: 45780,
+  cgst: 1144.5,
+  sgst: 1144.5,
+  igst: null,
+  roundOff: null,
+  grandTotal: 48609,
+  unreadableFields: [],
+};
+
+const s2 = buildInvoice(SAMPLE_2, {
+  id: "sample-2",
+  fileName: "purchase-invoice-2.png",
+  stock,
+  seenInvoiceNumbers: [],
+  direction: "purchase",
+});
+const s2codes = s2.flags.map((f) => f.code);
+check("held for review", s2.status === "review");
+check("supplier has no ledger", s2codes.includes("PARTY_NOT_IN_MASTERS"));
+check("lines add to 45,780", s2.computed.lineSum === 45780, String(s2.computed.lineSum));
+check("recomputed total is 48,069", s2.computed.expectedTotal === 48069, String(s2.computed.expectedTotal));
+check("difference is exactly 540", s2.computed.totalDelta === 540, String(s2.computed.totalDelta));
+check("transposed total flagged", s2codes.includes("TOTAL_MISMATCH"));
+check("two items need confirming", s2codes.filter((c) => c === "ITEM_LOW_CONFIDENCE").length === 2, s2codes.join(","));
+check("the third item matched outright", s2.lines[2].stockItemName === "Steel Thali 11 inch");
+check("a correct GSTIN raises nothing", !s2codes.some((c) => c.startsWith("GSTIN")), s2codes.join(","));
+
+// the whole point: correcting one thing does not release the others
+const s2fixed = buildInvoice(SAMPLE_2, {
+  id: "sample-2",
+  fileName: "purchase-invoice-2.png",
+  stock,
+  seenInvoiceNumbers: [],
+  direction: "purchase",
+  overrides: { createPartyAsNew: true, lineItems: { "0": "SI-004", "1": "SI-005" } },
+});
+check("still blocked by the wrong total", s2fixed.status === "review",
+  s2fixed.flags.map((f) => f.code).join(","));
+
+const s2done = buildInvoice(SAMPLE_2, {
+  id: "sample-2",
+  fileName: "purchase-invoice-2.png",
+  stock,
+  seenInvoiceNumbers: [],
+  direction: "purchase",
+  overrides: {
+    createPartyAsNew: true,
+    lineItems: { "0": "SI-004", "1": "SI-005" },
+    edits: { grandTotal: 48069 },
+  },
+});
+check("releases once the total is corrected", s2done.status === "ready",
+  s2done.flags.filter((f) => f.severity === "error").map((f) => f.code).join(","));
+
+/* --- 8. GSTIN check digit ---------------------------------------------- */
+console.log("\nGSTIN check digit catches what a format check cannot");
+check("real-world GSTIN validates", gstinIsValid("27AAPFU0939F1ZV"));
+check("second real-world GSTIN validates", gstinIsValid("29AAGCB7383J1Z4"));
+check("our invented supplier GSTIN is self-consistent", gstinIsValid("08NARAY7531V1ZN"));
+check("our invented shop GSTIN is self-consistent", gstinIsValid("08ABCDE1234F1Z0"));
+check(
+  "a well-formed GSTIN with one wrong character is rejected",
+  !gstinIsValid("08NARAY7531V1Z5"),
+);
+check(
+  "an observed misread is rejected",
+  !gstinIsValid("08ANARJ7531V1Z5"),
+  "this exact string came back from a real run on the blurred photo",
+);
+
+const badGstin = buildInvoice(
+  { ...SAMPLE_2, supplierGstin: "08ANARJ7531V1Z5" },
+  { id: "g", fileName: "g.png", stock, seenInvoiceNumbers: [], direction: "purchase" },
+);
+check("a misread GSTIN blocks the voucher",
+  badGstin.flags.some((f) => f.code === "GSTIN_CHECKSUM_FAILED" && f.severity === "error"),
+  badGstin.flags.map((f) => f.code).join(","));
+
+console.log(failed ? `\n${failed} check(s) failed\n` : `\nAll ${passed} checks passed\n`);
 process.exit(failed ? 1 : 0);

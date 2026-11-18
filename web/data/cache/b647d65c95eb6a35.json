@@ -2,10 +2,10 @@
   "invoiceNumber": "NSA/26-27/0912",
   "invoiceDate": "18-11-2026",
   "partyName": "Shree Balaji Steel House",
-  "partyGstin": "08ABCDE1234F1Z5",
+  "partyGstin": "08ABCDE1234F1Z0",
   "partyAddress": "Shop 14-A, Kishanpole Bazar, Jaipur, Rajasthan 302003",
   "supplierName": "NARAYAN STEEL AGENCY",
-  "supplierGstin": "08ANARJ7531V1Z5",
+  "supplierGstin": "08ANAR7V5311VZN",
   "lines": [
     {
       "description": "SS Box 2 Ltr",

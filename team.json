@@ -1,1 +1,9 @@
-{"team_name": "GoutamAgarwal", "project_title": "GoutamAgarwal Buildathon Project", "one_liner": "A physical-world tool built during the Masters Union Buildathon to make a real-world task easier and more reliable.", "track": "physical-world", "members": [{ "name": "Goutam Agarwal", "github": "Goutam098" }]}
+{
+  "team_name": "GoutamAgarwal",
+  "project_title": "Overnight Books",
+  "one_liner": "An AI-powered retail operations system that turns counter sales and supplier invoices into validated accounting and inventory records, eliminating duplicate manual data entry.",
+  "track": "physical-world",
+  "members": [
+    { "name": "Goutam Agarwal", "github": "Goutam098" }
+  ]
+}

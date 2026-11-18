@@ -633,6 +633,39 @@ export default function Page() {
                 )}
               </div>
 
+              {/* a GSTIN that fails its own check digit was misread; a human reads it off the bill */}
+              {!inv.approved &&
+                inv.flags.some(
+                  (f) => f.code === "GSTIN_CHECKSUM_FAILED" || f.code === "GSTIN_MALFORMED",
+                ) && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-5 py-3">
+                    <div className="rule-label w-16">GSTIN</div>
+                    <input
+                      type="text"
+                      defaultValue={
+                        (inv.direction === "purchase"
+                          ? inv.extraction.supplierGstin
+                          : inv.extraction.partyGstin) ?? ""
+                      }
+                      onBlur={(e) => {
+                        const v = e.target.value.trim().toUpperCase();
+                        if (!v) return;
+                        void override(inv.id, {
+                          edits:
+                            inv.direction === "purchase"
+                              ? { supplierGstin: v }
+                              : { partyGstin: v },
+                        });
+                      }}
+                      className="num w-[200px] rounded border px-2 py-1.5 text-[13px]"
+                      style={{ borderColor: "var(--error)", background: "var(--error-bg)" }}
+                    />
+                    <span className="text-[12px] text-muted">
+                      Open the bill image and type what is actually printed.
+                    </span>
+                  </div>
+                )}
+
               {/* lines */}
               <table className="ledger w-full text-[13.5px]">
                 <thead>

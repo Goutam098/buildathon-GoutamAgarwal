@@ -2,10 +2,10 @@
   "invoiceNumber": "JSU/2026-27/1184",
   "invoiceDate": "18-11-2026",
   "partyName": "Shree Balaji Steel House",
-  "partyGstin": "08ABCDE1234F1Z5",
+  "partyGstin": "08ABCDE1234F1Z0",
   "partyAddress": "Shop 14-A, Kishanpole Bazar, Jaipur, Rajasthan 302003",
-  "supplierName": "Jindal Steel Udyog",
-  "supplierGstin": "08JKLMN3579S1Z2",
+  "supplierName": "JINDAL STEEL UDYOG",
+  "supplierGstin": "08JKLMN3579S1ZW",
   "lines": [
     {
       "description": "Steel Thali 11 inch",

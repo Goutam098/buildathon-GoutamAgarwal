@@ -176,6 +176,32 @@ export function num(v: unknown): number {
 
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
+const GSTIN_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/**
+ * The 15th character of a GSTIN is a mod-36 check digit over the first 14.
+ *
+ * This matters more than it looks. A model reading a blurred bill does not
+ * produce obvious nonsense — it produces something that looks exactly like a
+ * GSTIN and is simply the wrong one. A format check waves that through. The
+ * check digit does not: change any character and the arithmetic stops working
+ * 35 times out of 36. It is the only way we can tell, from the bill alone,
+ * that a well-formed GSTIN was misread.
+ */
+export function gstinCheckDigit(first14: string): string {
+  let sum = 0;
+  for (let i = 0; i < 14; i++) {
+    const v = GSTIN_CHARS.indexOf(first14[i]);
+    if (v < 0) return "";
+    const p = v * (i % 2 ? 2 : 1);
+    sum += Math.floor(p / 36) + (p % 36);
+  }
+  return GSTIN_CHARS[(36 - (sum % 36)) % 36];
+}
+
+export const gstinIsValid = (g: string) =>
+  GSTIN_RE.test(g) && gstinCheckDigit(g.slice(0, 14)) === g[14];
+
 export function tallyDate(printed: string): string {
   // "18-11-2026" | "18/11/2026" | "2026-11-18" -> "20261118"
   const d = (printed || "").trim();
@@ -249,9 +275,16 @@ export function resolveInvoice(
   if (gstin && !GSTIN_RE.test(gstin)) {
     flags.push({
       code: "GSTIN_MALFORMED",
-      severity: "warn",
+      severity: "error",
       scope: "party",
-      message: `GSTIN "${gstin}" does not match the 15-character GST format.`,
+      message: `GSTIN "${gstin}" is not in the 15-character GST format.`,
+    });
+  } else if (gstin && !gstinIsValid(gstin)) {
+    flags.push({
+      code: "GSTIN_CHECKSUM_FAILED",
+      severity: "error",
+      scope: "party",
+      message: `GSTIN "${gstin}" looks like a GSTIN but fails its own check digit (the 15th character should be "${gstinCheckDigit(gstin.slice(0, 14))}"). It was most likely misread off the paper. Check it against the bill.`,
     });
   }
 
