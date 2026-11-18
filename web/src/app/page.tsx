@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Flag, ReviewInvoice } from "@/lib/types";
 import type { Ledger, StockItem } from "@/lib/masters";
 
-type Summary = { total: number; ready: number; review: number; value: number; lines: number; fields: number };
+type Summary = { total: number; ready: number; review: number; value: number; lines: number; fields: number; scanned: number };
 type Posted = { id: string; invoiceNumber: string; party: string; total: number; postedAt: string };
 
 const inr = (n: number) =>
@@ -316,13 +316,14 @@ export default function Page() {
           {summary && summary.total > 0 ? (
             <dl className="mt-3 space-y-2 text-[13.5px]">
               {[
-                ["Bills read", String(summary.total)],
-                ["Fields extracted", String(summary.fields)],
+                ["Documents today", String(summary.total)],
+                ["Bills read by camera", String(summary.scanned)],
+                ["Fields transcribed", String(summary.fields)],
                 ["Ready to post", String(summary.ready)],
                 ["Needs a human", String(summary.review)],
                 ["Value", inr(summary.value)],
               ].map(([k, v], i) => (
-                <div key={k} className="flex justify-between" style={i === 3 ? { color: "var(--review)" } : {}}>
+                <div key={k} className="flex justify-between" style={i === 4 ? { color: "var(--review)" } : {}}>
                   <dt className="text-muted">{k}</dt>
                   <dd className="num font-medium">{v}</dd>
                 </div>
@@ -360,7 +361,9 @@ export default function Page() {
                   className="rounded border border-line-strong bg-paper px-3 py-2 text-[13px]"
                 >
                   <option value="">Choose customer…</option>
-                  {ledgers.map((l) => (
+                  {ledgers
+                    .filter((l) => l.group === "Sundry Debtors")
+                    .map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
                       {l.stateCode !== "08" ? " (out of state)" : ""}
@@ -584,9 +587,13 @@ export default function Page() {
 
               {/* party */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-3">
-                <div className="rule-label w-14">Party</div>
+                <div className="rule-label w-16">
+                  {inv.direction === "purchase" ? "Supplier" : "Customer"}
+                </div>
                 <div className="text-[14px]">
-                  {inv.extraction.partyName}
+                  {(inv.direction === "purchase"
+                    ? inv.extraction.supplierName
+                    : inv.extraction.partyName) || "—"}
                   <span className="text-faint"> → </span>
                   <span className={inv.partyLedgerName ? "font-medium" : "text-error"}>
                     {inv.partyLedgerName ?? "no ledger"}
@@ -601,12 +608,20 @@ export default function Page() {
                       onChange={(e) => e.target.value && override(inv.id, { partyLedgerId: e.target.value })}
                       className="rounded border border-line-strong bg-paper px-2 py-1.5 text-[12.5px]"
                     >
-                      <option value="">Map to existing ledger…</option>
-                      {ledgers.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name}
-                        </option>
-                      ))}
+                      <option value="">
+                        Map to existing {inv.direction === "purchase" ? "supplier" : "customer"}…
+                      </option>
+                      {ledgers
+                        .filter((l) =>
+                          inv.direction === "purchase"
+                            ? l.group === "Sundry Creditors"
+                            : l.group === "Sundry Debtors",
+                        )
+                        .map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name}
+                          </option>
+                        ))}
                     </select>
                     <button
                       onClick={() => override(inv.id, { createPartyAsNew: true })}

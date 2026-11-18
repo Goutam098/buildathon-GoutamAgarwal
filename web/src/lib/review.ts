@@ -113,6 +113,9 @@ export function batchSummary(batch: ReviewInvoice[]) {
     batch.reduce((s, b) => s + (b.computed.statedTotal ?? b.computed.expectedTotal), 0),
   );
   const lines = batch.reduce((s, b) => s + b.lines.length, 0);
-  const fields = batch.reduce((s, b) => s + 9 + b.lines.length * 6, 0);
-  return { total: batch.length, ready, review, value, lines, fields };
+  // Only a photographed bill has fields that had to be transcribed. A counter
+  // sale was never read, so counting its fields would overstate the work done.
+  const scanned = batch.filter((b) => b.source !== "counter");
+  const fields = scanned.reduce((s, b) => s + 9 + b.lines.length * 6, 0);
+  return { total: batch.length, ready, review, value, lines, fields, scanned: scanned.length };
 }

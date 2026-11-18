@@ -98,11 +98,13 @@ export async function POST(req: Request) {
     }
   }
 
-  db.batch = batch;
+  // Append. A counter sale rung up earlier in the day belongs in the same
+  // day's book as the supplier bills that arrived with the goods.
+  db.batch = [...batch, ...db.batch];
   writeDB(db);
 
   return NextResponse.json({
-    batch,
+    batch: db.batch,
     failures,
     summary: batchSummary(batch),
     stock: db.stock,
