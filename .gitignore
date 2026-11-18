@@ -24,3 +24,12 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# app
+node_modules/
+.next/
+.env
+.env.local
+*.tsbuildinfo
+web/data/runtime/
+.DS_Store
