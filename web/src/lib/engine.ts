@@ -342,7 +342,7 @@ export function resolveInvoice(
 
   const taxableBase = statedTaxable ?? lineSum;
   const statedTax = round2(cgst + sgst + igst);
-  const rate = lines.find((l) => l.gstRate)?.gstRate ?? 18;
+  const rate = lines.find((l) => l.gstRate)?.gstRate ?? 5;
   const expectedTax = round2((taxableBase * rate) / 100);
 
   if (statedTax > 0 && Math.abs(statedTax - expectedTax) > 1) {
