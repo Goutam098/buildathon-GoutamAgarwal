@@ -13,10 +13,17 @@
 import Anthropic from "@anthropic-ai/sdk";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { ExtractedInvoice } from "./types";
 
-const CACHE_DIR = path.join(process.cwd(), "data", "cache");
+// The two sample bills' cached reads ship committed in the repo and are read
+// from there on every platform. New cache *writes* on Vercel go to /tmp
+// instead, since the project's own folder is read-only at runtime there.
+const CACHE_READ_DIR = path.join(process.cwd(), "data", "cache");
+const CACHE_WRITE_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), "overnight-books-cache")
+  : CACHE_READ_DIR;
 export const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5-5";
 
 const SYSTEM = `You transcribe Indian GST tax invoices for an accounting pipeline.
@@ -75,22 +82,21 @@ export function hashBuffer(buf: Buffer): string {
   return crypto.createHash("sha256").update(buf).digest("hex").slice(0, 16);
 }
 
-function cachePath(hash: string) {
-  return path.join(CACHE_DIR, `${hash}.json`);
-}
-
 export function readCache(hash: string): ExtractedInvoice | null {
-  try {
-    return JSON.parse(fs.readFileSync(cachePath(hash), "utf8")) as ExtractedInvoice;
-  } catch {
-    return null;
+  for (const dir of [CACHE_WRITE_DIR, CACHE_READ_DIR]) {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(dir, `${hash}.json`), "utf8")) as ExtractedInvoice;
+    } catch {
+      /* try the next place */
+    }
   }
+  return null;
 }
 
 function writeCache(hash: string, data: ExtractedInvoice) {
   try {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(cachePath(hash), JSON.stringify(data, null, 2), "utf8");
+    fs.mkdirSync(CACHE_WRITE_DIR, { recursive: true });
+    fs.writeFileSync(path.join(CACHE_WRITE_DIR, `${hash}.json`), JSON.stringify(data, null, 2), "utf8");
   } catch {
     /* cache is a convenience, never fatal */
   }

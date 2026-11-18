@@ -1,8 +1,15 @@
 /**
  * Tiny file-backed store. Stock levels and posted invoices have to survive a
  * dev-server reload, otherwise a demo that deducts stock proves nothing.
+ *
+ * On Vercel the project's own folder is read-only at runtime — only /tmp is
+ * writable, and it is wiped between cold starts of a serverless function. So
+ * on Vercel this is memory for the lifetime of one warm function instance,
+ * good enough to click through a live demo, not a real database. Locally it
+ * writes next to the project and genuinely persists across restarts.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { STOCK_ITEMS } from "./masters";
 import type { ReviewInvoice } from "./types";
@@ -27,7 +34,9 @@ export type DB = {
   seq: number;
 };
 
-const DIR = path.join(process.cwd(), "data", "runtime");
+const DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), "overnight-books")
+  : path.join(process.cwd(), "data", "runtime");
 const FILE = path.join(DIR, "db.json");
 
 function seed(): DB {
