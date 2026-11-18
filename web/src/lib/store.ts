@@ -22,6 +22,8 @@ export type DB = {
   stock: Record<string, number>;
   posted: PostedInvoice[];
   batch: ReviewInvoice[];
+  /** Next counter-sale voucher number in the shop's own series. */
+  seq: number;
 };
 
 const DIR = path.join(process.cwd(), "data", "runtime");
@@ -30,7 +32,7 @@ const FILE = path.join(DIR, "db.json");
 function seed(): DB {
   const stock: Record<string, number> = {};
   for (const s of STOCK_ITEMS) stock[s.id] = s.openingQty;
-  return { stock, posted: [], batch: [] };
+  return { stock, posted: [], batch: [], seq: 414 };
 }
 
 export function readDB(): DB {
@@ -38,6 +40,7 @@ export function readDB(): DB {
     const raw = fs.readFileSync(FILE, "utf8");
     const db = JSON.parse(raw) as DB;
     if (!db.stock || !db.posted || !db.batch) throw new Error("shape");
+    if (typeof db.seq !== "number") db.seq = 414;
     return db;
   } catch {
     const db = seed();

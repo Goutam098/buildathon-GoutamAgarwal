@@ -80,5 +80,5 @@ export type ReviewInvoice = {
   status: "ready" | "review";
   approved?: boolean;
   extractionMs?: number;
-  source?: "live" | "cached";
+  source?: "live" | "cached" | "counter";
 };

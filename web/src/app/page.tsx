@@ -77,6 +77,13 @@ export default function Page() {
   const [offline, setOffline] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [view, setView] = useState<"counter" | "bills">("counter");
+  const [customer, setCustomer] = useState("");
+  const [cart, setCart] = useState<{ stockItemId: string; qty: number }[]>([]);
+  const [pick, setPick] = useState("");
+  const [qty, setQty] = useState(1);
+  const [lastSale, setLastSale] = useState<ReviewInvoice | null>(null);
+
   const load = useCallback(async () => {
     const r = await fetch("/api/state");
     const d = await r.json();
@@ -152,11 +159,42 @@ export default function Page() {
     setBusy(null);
   }
 
+  async function completeSale() {
+    setBusy("sale");
+    setError(null);
+    const r = await fetch("/api/counter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ledgerId: customer, lines: cart }),
+    });
+    const d = await r.json();
+    setBusy(null);
+    if (!r.ok) return setError(d.error);
+    setBatch(d.batch);
+    setStock(d.stock);
+    setPosted(d.posted);
+    setSummary(d.summary);
+    setLastSale(d.invoice);
+    setCart([]);
+  }
+
   async function reset() {
     await fetch("/api/state", { method: "POST" });
     setError(null);
+    setCart([]);
+    setLastSale(null);
     await load();
   }
+
+  const cartLines = cart
+    .map((c) => {
+      const s = stockItems.find((x) => x.id === c.stockItemId);
+      return s ? { s, qty: c.qty, amount: s.rate * c.qty } : null;
+    })
+    .filter(Boolean) as { s: StockItem; qty: number; amount: number }[];
+  const cartTaxable = cartLines.reduce((a, l) => a + l.amount, 0);
+  const cartGstRate = cartLines[0]?.s.gstRate ?? 5;
+  const cartTax = Math.round((cartTaxable * cartGstRate) / 100 * 100) / 100;
 
   const readyUnposted = batch.filter((b) => b.status === "ready" && !b.approved);
   const movedItems = stockItems.filter((s) => (stock[s.id] ?? s.openingQty) !== s.openingQty);
@@ -193,7 +231,31 @@ export default function Page() {
         </div>
       </header>
 
+      {/* ---------------- tabs ---------------- */}
+      <nav className="mt-6 flex gap-1 border-b border-line">
+        {(
+          [
+            ["counter", "At the counter", "the sale is born digital"],
+            ["bills", "Bills from suppliers", "paper you did not create"],
+          ] as const
+        ).map(([key, label, hint]) => (
+          <button
+            key={key}
+            onClick={() => setView(key)}
+            className="-mb-px border-b-2 px-4 py-3 text-left"
+            style={{
+              borderColor: view === key ? "var(--ink)" : "transparent",
+              color: view === key ? "var(--ink)" : "var(--faint)",
+            }}
+          >
+            <span className="block text-[14px] font-medium">{label}</span>
+            <span className="block text-[11.5px]">{hint}</span>
+          </button>
+        ))}
+      </nav>
+
       {/* ---------------- intake ---------------- */}
+      {view === "bills" && (
       <section className="mt-7 grid gap-4 lg:grid-cols-[1fr_320px]">
         <div
           onDragOver={(e) => e.preventDefault()}
@@ -255,6 +317,7 @@ export default function Page() {
           )}
         </div>
       </section>
+      )}
 
       {error && (
         <p className="mt-4 rounded-md px-4 py-3 text-[13.5px]" style={{ background: "var(--error-bg)", color: "var(--error)" }}>
@@ -265,6 +328,141 @@ export default function Page() {
       {/* ---------------- body ---------------- */}
       <section className="mt-7 grid items-start gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-5">
+          {view === "counter" && (
+            <section className="rounded-lg border border-line bg-surface">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+                <div>
+                  <div className="rule-label">Counter sale</div>
+                  <p className="mt-1 text-[13px] text-muted">
+                    Ring it up here and there is no bill to photograph later. The entry, the stock
+                    movement and the Tally voucher all happen as the customer pays.
+                  </p>
+                </div>
+                <select
+                  value={customer}
+                  onChange={(e) => setCustomer(e.target.value)}
+                  className="rounded border border-line-strong bg-paper px-3 py-2 text-[13px]"
+                >
+                  <option value="">Choose customer…</option>
+                  {ledgers.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                      {l.stateCode !== "08" ? " (out of state)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
+                <select
+                  value={pick}
+                  onChange={(e) => setPick(e.target.value)}
+                  className="min-w-[230px] flex-1 rounded border border-line-strong bg-paper px-3 py-2 text-[13px]"
+                >
+                  <option value="">Add an item…</option>
+                  {stockItems.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} · ₹{s.rate} · {stock[s.id] ?? s.openingQty} left
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  value={qty}
+                  onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
+                  className="num w-20 rounded border border-line-strong bg-paper px-3 py-2 text-[13px]"
+                />
+                <button
+                  onClick={() => {
+                    if (!pick) return;
+                    setCart((c) => [...c, { stockItemId: pick, qty }]);
+                    setPick("");
+                    setQty(1);
+                  }}
+                  className="rounded-md border border-ink px-4 py-2 text-[13px] font-medium"
+                >
+                  Add
+                </button>
+              </div>
+
+              {cartLines.length > 0 ? (
+                <>
+                  <table className="ledger w-full text-[13.5px]">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th className="text-right">Qty</th>
+                        <th className="text-right">Rate</th>
+                        <th className="text-right">Amount</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cartLines.map((l, i) => (
+                        <tr key={i}>
+                          <td>{l.s.name}</td>
+                          <td className="num text-right">{l.qty}</td>
+                          <td className="num text-right">{l.s.rate.toFixed(2)}</td>
+                          <td className="num text-right font-medium">{l.amount.toFixed(2)}</td>
+                          <td className="text-right">
+                            <button
+                              onClick={() => setCart((c) => c.filter((_, j) => j !== i))}
+                              className="text-[12px] text-faint hover:text-error"
+                            >
+                              remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="flex flex-wrap items-end justify-between gap-4 border-t border-line px-5 py-4">
+                    <dl className="space-y-1 text-[13px]">
+                      <div className="flex gap-6">
+                        <dt className="w-28 text-muted">Taxable</dt>
+                        <dd className="num">{cartTaxable.toFixed(2)}</dd>
+                      </div>
+                      <div className="flex gap-6">
+                        <dt className="w-28 text-muted">GST @ {cartGstRate}%</dt>
+                        <dd className="num">{cartTax.toFixed(2)}</dd>
+                      </div>
+                      <div className="flex gap-6 border-t border-line pt-1 text-[15px] font-semibold">
+                        <dt className="w-28">Total</dt>
+                        <dd className="num">{inr(cartTaxable + cartTax)}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      onClick={completeSale}
+                      disabled={!customer || !!busy}
+                      className="rounded-md bg-ink px-5 py-3 text-[14px] font-medium text-paper disabled:opacity-35"
+                    >
+                      {busy === "sale" ? "Posting…" : "Complete sale"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="px-5 py-6 text-[13.5px] text-faint">
+                  Nothing on the counter yet.
+                </p>
+              )}
+
+              {lastSale && (
+                <div
+                  className="fade-in flex flex-wrap items-center gap-x-5 gap-y-1 border-t px-5 py-3 text-[13px]"
+                  style={{ background: "var(--ready-bg)", color: "var(--ready)", borderColor: "var(--line)" }}
+                >
+                  <span className="num font-semibold">{lastSale.extraction.invoiceNumber}</span>
+                  <span>posted to {lastSale.partyLedgerName}</span>
+                  <span>·</span>
+                  <span>stock moved</span>
+                  <span>·</span>
+                  <span>0 fields transcribed, 0 to review</span>
+                </div>
+              )}
+            </section>
+          )}
+
           {batch.map((inv) => (
             <article key={inv.id} className="fade-in overflow-hidden rounded-lg border border-line bg-surface">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
@@ -282,7 +480,11 @@ export default function Page() {
                   </div>
                   <p className="mt-1 text-[12.5px] text-faint">
                     {inv.fileName} · {inv.extraction.invoiceDate} ·{" "}
-                    {inv.source === "cached" ? "from cache" : `read in ${((inv.extractionMs ?? 0) / 1000).toFixed(1)}s`}
+                    {inv.source === "counter"
+                      ? "born digital, nothing transcribed"
+                      : inv.source === "cached"
+                        ? "from cache"
+                        : `read in ${((inv.extractionMs ?? 0) / 1000).toFixed(1)}s`}
                   </p>
                 </div>
                 {inv.imageUrl && (

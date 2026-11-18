@@ -20,7 +20,7 @@ export function buildInvoice(
     seenInvoiceNumbers: string[];
     overrides?: Overrides;
     extractionMs?: number;
-    source?: "live" | "cached";
+    source?: "live" | "cached" | "counter";
   },
 ): ReviewInvoice {
   const o = opts.overrides ?? {};

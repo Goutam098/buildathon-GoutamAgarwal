@@ -116,11 +116,25 @@ export async function extractInvoice(
   }
 
   const key = process.env.ANTHROPIC_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+
+  if (!key && openaiKey) {
+    try {
+      const extraction = await viaOpenAI(buf, mediaType, openaiKey);
+      writeCache(hash, extraction);
+      return { extraction, source: "live", ms: Date.now() - started };
+    } catch (err) {
+      const hit = readCache(hash);
+      if (hit) return { extraction: hit, source: "cached", ms: Date.now() - started };
+      throw err;
+    }
+  }
+
   if (!key) {
     const hit = readCache(hash);
     if (hit) return { extraction: hit, source: "cached", ms: Date.now() - started };
     throw new Error(
-      "ANTHROPIC_API_KEY is not set and this bill has no cached read. Add the key to web/.env.local and restart.",
+      "No ANTHROPIC_API_KEY or OPENAI_API_KEY set, and this bill has no cached read. Put a key in web/.env.local.",
     );
   }
 
@@ -176,4 +190,73 @@ export async function extractInvoice(
     if (hit) return { extraction: hit, source: "cached", ms: Date.now() - started };
     throw err;
   }
+}
+
+/** Shape whatever the model returned into the type the engine expects. */
+function coerce(raw: Partial<ExtractedInvoice>): ExtractedInvoice {
+  return {
+    invoiceNumber: raw.invoiceNumber ?? "",
+    invoiceDate: raw.invoiceDate ?? "",
+    partyName: raw.partyName ?? "",
+    partyGstin: raw.partyGstin ?? null,
+    partyAddress: raw.partyAddress ?? null,
+    supplierName: raw.supplierName ?? null,
+    supplierGstin: raw.supplierGstin ?? null,
+    lines: raw.lines ?? [],
+    taxableValue: raw.taxableValue ?? null,
+    cgst: raw.cgst ?? null,
+    sgst: raw.sgst ?? null,
+    igst: raw.igst ?? null,
+    roundOff: raw.roundOff ?? null,
+    grandTotal: raw.grandTotal ?? null,
+    unreadableFields: raw.unreadableFields ?? [],
+  };
+}
+
+/**
+ * Same prompt, same schema, different vendor. The reading step is deliberately
+ * the only replaceable part of the system — everything that decides what goes
+ * into the books is ours.
+ */
+async function viaOpenAI(
+  buf: Buffer,
+  mediaType: string,
+  apiKey: string,
+): Promise<ExtractedInvoice> {
+  const model = process.env.OPENAI_MODEL || "gpt-4o";
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      max_tokens: 2048,
+      messages: [
+        { role: "system", content: SYSTEM },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Transcribe this invoice exactly as printed." },
+            {
+              type: "image_url",
+              image_url: { url: `data:${mediaType};base64,${buf.toString("base64")}` },
+            },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "record_invoice", strict: false, schema: TOOL.input_schema },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`OpenAI ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) throw new Error("OpenAI returned no content.");
+  return coerce(JSON.parse(text) as Partial<ExtractedInvoice>);
 }
