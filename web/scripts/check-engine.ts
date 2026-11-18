@@ -146,5 +146,62 @@ check("inventory moves with the voucher", xml.includes("<ACTUALQTY>48 PCS</ACTUA
 check("rate carries its unit", xml.includes("<RATE>185.00/PCS</RATE>"));
 check("bill reference for outstanding", xml.includes("<BILLTYPE>New Ref</BILLTYPE>"));
 
+/* --- 6. purchases are the mirror image --------------------------------- */
+console.log("\nPurchases run the same engine the other way round");
+
+const PURCHASE: ExtractedInvoice = {
+  invoiceNumber: "JSU/2026-27/1184",
+  invoiceDate: "18-11-2026",
+  partyName: "Shree Balaji Steel House", // billed TO us
+  partyGstin: "08ABCDE1234F1Z5",
+  supplierName: "Jindal Steel Udyog", // issued BY them
+  supplierGstin: "08JKLMN3579S1Z2",
+  lines: [
+    { description: "Steel Thali 11 inch", hsn: "7323", qty: 100, unit: "PCS", rate: 142, amount: 14200 },
+    { description: "Kadhai 24 cm Heavy Base", hsn: "7323", qty: 30, unit: "PCS", rate: 338, amount: 10140 },
+  ],
+  taxableValue: 24340,
+  cgst: 608.5,
+  sgst: 608.5,
+  igst: null,
+  roundOff: null,
+  grandTotal: 25557,
+  unreadableFields: [],
+};
+
+const pur = buildInvoice(PURCHASE, {
+  id: "pur-1",
+  fileName: "pur-1.png",
+  stock,
+  seenInvoiceNumbers: [],
+  direction: "purchase",
+});
+check("counterparty is the issuer, not the bill-to", pur.partyLedgerName === "Jindal Steel Udyog",
+  String(pur.partyLedgerName));
+check("status is ready", pur.status === "ready", pur.flags.map((f) => f.code).join(","));
+
+// A purchase for more units than we hold is normal — that is what restocking is.
+const big = buildInvoice(
+  { ...PURCHASE, invoiceNumber: "JSU/2026-27/9999", lines: [{ description: "Steel Thali 11 inch", hsn: "7323", qty: 5000, unit: "PCS", rate: 142, amount: 710000 }], taxableValue: 710000, cgst: 17750, sgst: 17750, grandTotal: 745500 },
+  { id: "pur-2", fileName: "pur-2.png", stock, seenInvoiceNumbers: [], direction: "purchase" },
+);
+check("a large purchase is not a stock shortfall",
+  !big.flags.some((f) => f.code === "INSUFFICIENT_STOCK"), big.flags.map((f) => f.code).join(","));
+
+// A customer must never satisfy a supplier lookup, or money lands in the wrong ledger.
+const wrongPool = buildInvoice(
+  { ...PURCHASE, supplierName: "Maheshwari Bhandar", supplierGstin: "08MNOPQ9876R1Z4" },
+  { id: "pur-3", fileName: "pur-3.png", stock, seenInvoiceNumbers: [], direction: "purchase" },
+);
+check("a customer cannot be matched as a supplier",
+  wrongPool.partyLedgerName === null, String(wrongPool.partyLedgerName));
+
+const pxml = buildTallyXml([pur]);
+check("emits a Purchase voucher", pxml.includes('VCHTYPE="Purchase"'));
+check("supplier is credited (positive, not deemed positive)",
+  pxml.includes("<AMOUNT>25557.00</AMOUNT>"));
+check("purchase ledger is debited", pxml.includes("Purchase - Local 5%") && pxml.includes("<AMOUNT>-14200.00</AMOUNT>"));
+check("input GST, not output", pxml.includes("Input CGST 2.5%") && !pxml.includes("Output CGST"));
+
 console.log(failed ? `\n${failed} check(s) failed\n` : "\nAll checks passed\n");
 process.exit(failed ? 1 : 0);
