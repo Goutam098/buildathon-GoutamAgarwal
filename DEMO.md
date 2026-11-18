@@ -106,9 +106,10 @@ it). Correct the total to `48069`.*
 
 | Problem | Fix |
 |---|---|
-| API is slow or down | Tick **Offline mode** before running the batch — replays from cache |
+| API is slow or down | Tick **Offline mode** before running the batch — both bills replay from cache in about 0.25s |
 | Stock looks wrong | **Reset day** |
 | Posted something twice | **Reverse this posting** on the card; units go back once |
+| Every page 500s | Something ran `npm run build` while `npm run dev` was live and deleted `.next`. Stop the server, `rm -rf web/.next`, `npm run dev` again. **Never run a production build while the dev server is up.** |
 
 ## Don't say
 
