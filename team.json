@@ -1,9 +1,1 @@
-{
-  "team_name": "CHANGE_ME",
-  "project_title": "CHANGE_ME",
-  "one_liner": "CHANGE_ME: one sentence about what you're building",
-  "track": "CHANGE_ME: physical-world | ai-agents | area-of-expertise",
-  "members": [
-    { "name": "CHANGE_ME", "github": "CHANGE_ME" }
-  ]
-}
+{"team_name": "GoutamAgarwal", "project_title": "GoutamAgarwal Buildathon Project", "one_liner": "A physical-world tool built during the Masters Union Buildathon to make a real-world task easier and more reliable.", "track": "physical-world", "members": [{ "name": "Goutam Agarwal", "github": "Goutam098" }]}
