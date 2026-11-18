@@ -79,9 +79,8 @@ export default function Page() {
 
   const [view, setView] = useState<"counter" | "bills">("counter");
   const [customer, setCustomer] = useState("");
-  const [cart, setCart] = useState<{ stockItemId: string; qty: number }[]>([]);
-  const [pick, setPick] = useState("");
-  const [qty, setQty] = useState(1);
+  const [cart, setCart] = useState<{ stockItemId: string; qty: number; rate: number }[]>([]);
+  const [search, setSearch] = useState("");
   const [lastSale, setLastSale] = useState<ReviewInvoice | null>(null);
 
   const load = useCallback(async () => {
@@ -178,6 +177,22 @@ export default function Page() {
     setCart([]);
   }
 
+  async function cancelPosting(id: string) {
+    setBusy("cancel");
+    const r = await fetch("/api/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const d = await r.json();
+    setBusy(null);
+    if (!r.ok) return setError(d.error);
+    setBatch(d.batch);
+    setStock(d.stock);
+    setPosted(d.posted);
+    setSummary(d.summary);
+  }
+
   async function reset() {
     await fetch("/api/state", { method: "POST" });
     setError(null);
@@ -189,9 +204,9 @@ export default function Page() {
   const cartLines = cart
     .map((c) => {
       const s = stockItems.find((x) => x.id === c.stockItemId);
-      return s ? { s, qty: c.qty, amount: s.rate * c.qty } : null;
+      return s ? { s, qty: c.qty, rate: c.rate, amount: Math.round(c.rate * c.qty * 100) / 100 } : null;
     })
-    .filter(Boolean) as { s: StockItem; qty: number; amount: number }[];
+    .filter(Boolean) as { s: StockItem; qty: number; rate: number; amount: number }[];
   const cartTaxable = cartLines.reduce((a, l) => a + l.amount, 0);
   const cartGstRate = cartLines[0]?.s.gstRate ?? 5;
   const cartTax = Math.round((cartTaxable * cartGstRate) / 100 * 100) / 100;
@@ -354,37 +369,49 @@ export default function Page() {
                 </select>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
-                <select
-                  value={pick}
-                  onChange={(e) => setPick(e.target.value)}
-                  className="min-w-[230px] flex-1 rounded border border-line-strong bg-paper px-3 py-2 text-[13px]"
-                >
-                  <option value="">Add an item…</option>
-                  {stockItems.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} · ₹{s.rate} · {stock[s.id] ?? s.openingQty} left
-                    </option>
-                  ))}
-                </select>
+              <div className="border-b border-line px-5 py-3">
                 <input
-                  type="number"
-                  min={1}
-                  value={qty}
-                  onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
-                  className="num w-20 rounded border border-line-strong bg-paper px-3 py-2 text-[13px]"
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search the catalogue — thali, bottle, kadhai…"
+                  className="w-full rounded border border-line-strong bg-paper px-3 py-2.5 text-[13.5px]"
                 />
-                <button
-                  onClick={() => {
-                    if (!pick) return;
-                    setCart((c) => [...c, { stockItemId: pick, qty }]);
-                    setPick("");
-                    setQty(1);
-                  }}
-                  className="rounded-md border border-ink px-4 py-2 text-[13px] font-medium"
-                >
-                  Add
-                </button>
+                {search.trim() && (
+                  <ul className="mt-2 divide-y divide-line overflow-hidden rounded border border-line">
+                    {stockItems
+                      .filter((s) => s.name.toLowerCase().includes(search.trim().toLowerCase()))
+                      .slice(0, 6)
+                      .map((s) => {
+                        const left = stock[s.id] ?? s.openingQty;
+                        return (
+                          <li key={s.id}>
+                            <button
+                              onClick={() => {
+                                setCart((c) => {
+                                  const at = c.findIndex((x) => x.stockItemId === s.id);
+                                  if (at === -1) return [...c, { stockItemId: s.id, qty: 1, rate: s.rate }];
+                                  const next = [...c];
+                                  next[at] = { ...next[at], qty: next[at].qty + 1 };
+                                  return next;
+                                });
+                                setSearch("");
+                              }}
+                              className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-[13.5px] hover:bg-paper"
+                            >
+                              <span>{s.name}</span>
+                              <span className="num shrink-0 text-[12px] text-faint">
+                                ₹{s.rate} · {left} left
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    {!stockItems.some((s) =>
+                      s.name.toLowerCase().includes(search.trim().toLowerCase()),
+                    ) && <li className="px-3 py-2.5 text-[13px] text-faint">Nothing in the catalogue matches.</li>}
+                  </ul>
+                )}
               </div>
 
               {cartLines.length > 0 ? (
@@ -400,22 +427,60 @@ export default function Page() {
                       </tr>
                     </thead>
                     <tbody>
-                      {cartLines.map((l, i) => (
-                        <tr key={i}>
-                          <td>{l.s.name}</td>
-                          <td className="num text-right">{l.qty}</td>
-                          <td className="num text-right">{l.s.rate.toFixed(2)}</td>
-                          <td className="num text-right font-medium">{l.amount.toFixed(2)}</td>
-                          <td className="text-right">
-                            <button
-                              onClick={() => setCart((c) => c.filter((_, j) => j !== i))}
-                              className="text-[12px] text-faint hover:text-error"
-                            >
-                              remove
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {cartLines.map((l, i) => {
+                        const left = stock[l.s.id] ?? l.s.openingQty;
+                        const short = l.qty > left;
+                        return (
+                          <tr key={i}>
+                            <td>
+                              {l.s.name}
+                              <div className="num mt-0.5 text-[11px]" style={{ color: short ? "var(--error)" : "var(--faint)" }}>
+                                {left} in stock{short ? " — not enough" : ""}
+                              </div>
+                            </td>
+                            <td className="text-right">
+                              <input
+                                type="number"
+                                min={1}
+                                value={l.qty}
+                                onChange={(e) =>
+                                  setCart((c) =>
+                                    c.map((x, j) =>
+                                      j === i ? { ...x, qty: Math.max(1, Number(e.target.value)) } : x,
+                                    ),
+                                  )
+                                }
+                                className="num w-16 rounded border border-line-strong bg-paper px-2 py-1 text-right text-[13px]"
+                              />
+                            </td>
+                            <td className="text-right">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={l.rate}
+                                onChange={(e) =>
+                                  setCart((c) =>
+                                    c.map((x, j) =>
+                                      j === i ? { ...x, rate: Math.max(0, Number(e.target.value)) } : x,
+                                    ),
+                                  )
+                                }
+                                className="num w-24 rounded border border-line-strong bg-paper px-2 py-1 text-right text-[13px]"
+                              />
+                            </td>
+                            <td className="num text-right font-medium">{l.amount.toFixed(2)}</td>
+                            <td className="text-right">
+                              <button
+                                onClick={() => setCart((c) => c.filter((_, j) => j !== i))}
+                                className="text-[12px] text-faint hover:text-error"
+                              >
+                                remove
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   <div className="flex flex-wrap items-end justify-between gap-4 border-t border-line px-5 py-4">
@@ -472,7 +537,20 @@ export default function Page() {
                     <h2 className="num text-[15px] font-semibold">
                       {inv.extraction.invoiceNumber || "No invoice number"}
                     </h2>
-                    {inv.approved ? (
+                    <span
+                      className="rule-label rounded px-2 py-1"
+                      style={{ border: "1px solid var(--line-strong)" }}
+                    >
+                      {inv.direction === "purchase" ? "Purchase ↓ stock in" : "Sale ↑ stock out"}
+                    </span>
+                    {inv.cancelled ? (
+                      <span
+                        className="rule-label rounded-full px-2.5 py-1"
+                        style={{ background: "var(--error-bg)", color: "var(--error)" }}
+                      >
+                        Reversed
+                      </span>
+                    ) : inv.approved ? (
                       <span
                         className="rule-label rounded-full px-2.5 py-1"
                         style={{ background: "var(--ready-bg)", color: "var(--ready)" }}
@@ -617,13 +695,26 @@ export default function Page() {
                     <dt>Bill says</dt>
                     <dd className="num">{(inv.computed.statedTotal ?? 0).toFixed(2)}</dd>
                   </div>
-                  {!inv.approved && (
+                  {inv.approved && !inv.cancelled ? (
+                    <button
+                      onClick={() => cancelPosting(inv.id)}
+                      disabled={!!busy}
+                      className="mt-2 w-full rounded-md border py-2.5 text-[13px] font-medium disabled:opacity-35"
+                      style={{ borderColor: "var(--error)", color: "var(--error)" }}
+                    >
+                      Reverse this posting
+                    </button>
+                  ) : inv.cancelled ? (
+                    <p className="mt-2 text-[12px] text-faint">
+                      Reversed. The units went back and the voucher stays in history as void.
+                    </p>
+                  ) : (
                     <button
                       onClick={() => approve([inv.id])}
                       disabled={inv.status !== "ready" || !!busy}
                       className="mt-2 w-full rounded-md bg-ink py-2.5 text-[13px] font-medium text-paper disabled:cursor-not-allowed disabled:opacity-35"
                     >
-                      Approve &amp; move stock
+                      {inv.direction === "purchase" ? "Approve & add to stock" : "Approve & move stock"}
                     </button>
                   )}
                 </dl>
@@ -651,12 +742,23 @@ export default function Page() {
                 <tbody>
                   {movedItems.map((s) => {
                     const closing = stock[s.id] ?? s.openingQty;
+                    const delta = Math.round((closing - s.openingQty) * 100) / 100;
                     return (
                       <tr key={s.id}>
                         <td className="py-1 pr-2">{s.name}</td>
                         <td className="num py-1 text-right text-faint">{s.openingQty}</td>
-                        <td className="num py-1 text-right" style={{ color: closing < 0 ? "var(--error)" : "var(--ready)" }}>
-                          → {closing}
+                        <td
+                          className="num py-1 pl-2 text-right font-medium"
+                          style={{ color: delta > 0 ? "var(--ready)" : "var(--review)" }}
+                        >
+                          {delta > 0 ? "+" : ""}
+                          {delta}
+                        </td>
+                        <td
+                          className="num py-1 pl-2 text-right"
+                          style={{ color: closing < 0 ? "var(--error)" : "var(--ink)" }}
+                        >
+                          {closing}
                         </td>
                       </tr>
                     );

@@ -1,0 +1,42 @@
+{
+  "invoiceNumber": "JSU/2026-27/1184",
+  "invoiceDate": "18-11-2026",
+  "partyName": "Shree Balaji Steel House",
+  "partyGstin": "08ABCDE1234F1Z5",
+  "partyAddress": "Shop 14-A, Kishanpole Bazar, Jaipur, Rajasthan 302003",
+  "supplierName": "Jindal Steel Udyog",
+  "supplierGstin": "08JKLMN3579S1Z2",
+  "lines": [
+    {
+      "description": "Steel Thali 11 inch",
+      "hsn": "7323",
+      "qty": 100,
+      "unit": "PCS",
+      "rate": 142,
+      "amount": 14200
+    },
+    {
+      "description": "SS Water Bottle 1 Litre",
+      "hsn": "7323",
+      "qty": 60,
+      "unit": "PCS",
+      "rate": 186,
+      "amount": 11160
+    },
+    {
+      "description": "Kadhai 24 cm Heavy Base",
+      "hsn": "7323",
+      "qty": 30,
+      "unit": "PCS",
+      "rate": 338,
+      "amount": 10140
+    }
+  ],
+  "taxableValue": 35500,
+  "cgst": 887.5,
+  "sgst": 887.5,
+  "igst": null,
+  "roundOff": null,
+  "grandTotal": 37275,
+  "unreadableFields": []
+}

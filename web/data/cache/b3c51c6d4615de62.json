@@ -1,0 +1,42 @@
+{
+  "invoiceNumber": "NSA/26-27/0912",
+  "invoiceDate": "18-11-2026",
+  "partyName": "Shree Balaji Steel House",
+  "partyGstin": "08ABCDE1234F1Z5",
+  "partyAddress": "Shop 14-A, Kishanpole Bazar, Jaipur, Rajasthan 302003 State: Rajasthan (08)",
+  "supplierName": "NARAYAN STEEL AGENCY",
+  "supplierGstin": "08ANARAY7531V1Z5",
+  "lines": [
+    {
+      "description": "SS Box 2 Ltr",
+      "hsn": "7323",
+      "qty": 80,
+      "unit": "PCS",
+      "rate": 236,
+      "amount": 18880
+    },
+    {
+      "description": "Tadka Pan Small",
+      "hsn": "7323",
+      "qty": 50,
+      "unit": "PCS",
+      "rate": 112,
+      "amount": 5600
+    },
+    {
+      "description": "Steel Thali 11 inch",
+      "hsn": "7323",
+      "qty": 150,
+      "unit": "PCS",
+      "rate": 142,
+      "amount": 21300
+    }
+  ],
+  "taxableValue": 45780,
+  "cgst": 1144.5,
+  "sgst": 1144.5,
+  "igst": null,
+  "roundOff": null,
+  "grandTotal": 48609,
+  "unreadableFields": []
+}

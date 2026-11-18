@@ -23,15 +23,23 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const { ledgerId, lines } = (await req.json()) as {
     ledgerId: string;
-    lines: { stockItemId: string; qty: number }[];
+    lines: { stockItemId: string; qty: number; rate?: number }[];
   };
 
   const ledger = LEDGERS.find((l) => l.id === ledgerId);
   if (!ledger) return NextResponse.json({ error: "Pick a customer." }, { status: 400 });
 
   const picked = (lines ?? [])
-    .map((l) => ({ item: STOCK_ITEMS.find((s) => s.id === l.stockItemId), qty: Number(l.qty) }))
-    .filter((l) => l.item && l.qty > 0) as { item: (typeof STOCK_ITEMS)[number]; qty: number }[];
+    .map((l) => ({
+      item: STOCK_ITEMS.find((s) => s.id === l.stockItemId),
+      qty: Number(l.qty),
+      rate: l.rate == null ? undefined : Number(l.rate),
+    }))
+    .filter((l) => l.item && l.qty > 0) as {
+      item: (typeof STOCK_ITEMS)[number];
+      qty: number;
+      rate?: number;
+    }[];
 
   if (!picked.length) return NextResponse.json({ error: "Add at least one item." }, { status: 400 });
 
@@ -40,14 +48,11 @@ export async function POST(req: Request) {
   const now = new Date();
   const date = `${String(now.getDate()).padStart(2, "0")}-${String(now.getMonth() + 1).padStart(2, "0")}-${now.getFullYear()}`;
 
-  const invoiceLines = picked.map(({ item, qty }) => ({
-    description: item.name,
-    hsn: item.hsn,
-    qty,
-    unit: item.unit,
-    rate: item.rate,
-    amount: round2(item.rate * qty),
-  }));
+  // The counter can discount a line. The rate used is the rate posted.
+  const invoiceLines = picked.map(({ item, qty, rate }) => {
+    const r = rate && rate > 0 ? round2(rate) : item.rate;
+    return { description: item.name, hsn: item.hsn, qty, unit: item.unit, rate: r, amount: round2(r * qty) };
+  });
 
   const taxable = round2(invoiceLines.reduce((s, l) => s + l.amount, 0));
   const gstRate = picked[0].item.gstRate;
