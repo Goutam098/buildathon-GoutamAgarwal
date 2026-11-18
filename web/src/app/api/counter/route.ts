@@ -76,6 +76,7 @@ export async function POST(req: Request) {
     fileName: "Counter sale",
     stock: db.stock,
     seenInvoiceNumbers: seenInvoiceNumbers(db),
+    direction: "sales",
     source: "counter",
     extractionMs: 0,
   });
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
     inv.approved = true;
     db.posted.push({
       id: inv.id,
+      direction: "sales",
       invoiceNumber: number,
       invoiceDate: date,
       party: ledger.name,

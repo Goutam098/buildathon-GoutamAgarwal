@@ -18,6 +18,7 @@ export function buildInvoice(
     imageUrl?: string;
     stock: Record<string, number>;
     seenInvoiceNumbers: string[];
+    direction: "sales" | "purchase";
     overrides?: Overrides;
     extractionMs?: number;
     source?: "live" | "cached" | "counter";
@@ -32,6 +33,7 @@ export function buildInvoice(
     imageUrl: opts.imageUrl,
     stock: opts.stock,
     seenInvoiceNumbers: opts.seenInvoiceNumbers,
+    direction: opts.direction,
   });
 
   let flags: Flag[] = inv.flags;
@@ -48,7 +50,7 @@ export function buildInvoice(
     }
   } else if (o.createPartyAsNew) {
     inv.partyLedgerId = null;
-    inv.partyLedgerName = merged.partyName;
+    inv.partyLedgerName = (opts.direction === "purchase" ? merged.supplierName : merged.partyName) || "";
     inv.partyScore = 1;
     inv.isNewLedger = true;
     flags = flags.filter((f) => f.code !== "PARTY_NOT_IN_MASTERS");
@@ -56,7 +58,7 @@ export function buildInvoice(
       code: "LEDGER_WILL_BE_CREATED",
       severity: "info",
       scope: "party",
-      message: `"${merged.partyName}" will be created as a new Sundry Debtor in the import file.`,
+      message: `"${inv.partyLedgerName}" will be created as a new ${opts.direction === "purchase" ? "Sundry Creditor" : "Sundry Debtor"} in the import file.`,
     });
   }
 

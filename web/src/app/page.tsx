@@ -207,9 +207,10 @@ export default function Page() {
           <div className="rule-label">Shree Balaji Steel House · GSTIN 08ABCDE1234F1Z5 · Jaipur</div>
           <h1 className="mt-1.5 text-[30px] leading-none font-semibold tracking-tight">Overnight Books</h1>
           <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-muted">
-            Photograph the day&apos;s bills. They are read, matched against the shop&apos;s own Tally
-            ledgers and stock items, and checked against their own arithmetic. Only what the system
-            is unsure about reaches a human.
+            Sales are rung up here, so there is no bill to retype later. Purchase bills arrive on
+            someone else&apos;s paper, so those get photographed, read, matched to this shop&apos;s own
+            ledgers and stock, and checked against their own arithmetic. Either way, only what the
+            system is unsure about reaches a human.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -471,11 +472,15 @@ export default function Page() {
                     <h2 className="num text-[15px] font-semibold">
                       {inv.extraction.invoiceNumber || "No invoice number"}
                     </h2>
-                    <StatusPill status={inv.status} />
-                    {inv.approved && (
-                      <span className="rule-label" style={{ color: "var(--ready)" }}>
-                        ✓ Posted
+                    {inv.approved ? (
+                      <span
+                        className="rule-label rounded-full px-2.5 py-1"
+                        style={{ background: "var(--ready-bg)", color: "var(--ready)" }}
+                      >
+                        ✓ Posted · stock moved
                       </span>
+                    ) : (
+                      <StatusPill status={inv.status} />
                     )}
                   </div>
                   <p className="mt-1 text-[12.5px] text-faint">

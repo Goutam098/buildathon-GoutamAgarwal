@@ -8,7 +8,7 @@ import { readDB, writeDB, seenInvoiceNumbers } from "@/lib/store";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const SAMPLES = ["sales-invoice-1.png", "sales-invoice-2.png"];
+const SAMPLES = ["purchase-invoice-1.png", "purchase-invoice-2.png"];
 
 type Incoming = { name: string; buf: Buffer; media: "image/png" | "image/jpeg" | "image/webp"; url?: string };
 
@@ -63,6 +63,7 @@ export async function POST(req: Request) {
           imageUrl: item.url,
           stock: db.stock,
           seenInvoiceNumbers: seen,
+          direction: "purchase",
           extractionMs: ms,
           source,
         });

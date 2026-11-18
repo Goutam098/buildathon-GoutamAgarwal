@@ -4,11 +4,17 @@
  * Tally imports an <ENVELOPE> of TALLYMESSAGE blocks. We emit:
  *   1. LEDGER masters for any party the shop approved as new, so the voucher
  *      has something to post against, and
- *   2. one Sales VOUCHER per approved bill, in Invoice Voucher View, with
- *      inventory allocations so stock moves in Tally too.
+ *   2. one VOUCHER per approved bill — Sales or Purchase — in Invoice Voucher
+ *      View, with inventory allocations so stock moves in Tally too.
  *
- * Sign convention: a debit carries ISDEEMEDPOSITIVE Yes and a negative
- * AMOUNT; a credit carries No and a positive AMOUNT.
+ * The two directions are mirror images:
+ *
+ *            party            goods / expense       stock
+ *   SALES    debited (Dr)     sales credited        goes out
+ *   PURCHASE credited (Cr)    purchase debited      comes in
+ *
+ * In Tally's XML a debit is ISDEEMEDPOSITIVE Yes with a negative AMOUNT, and a
+ * credit is No with a positive AMOUNT. Every sign below follows from that.
  *
  * Honest limit: this is written to Tally's documented import schema. Validate
  * it against the Tally Prime build on the shop's own machine before anyone
@@ -27,12 +33,21 @@ const esc = (s: string) =>
 
 const amt = (n: number) => round2(n).toFixed(2);
 
-function ledgerMaster(name: string, gstin: string | null, stateCode: string): string {
-  const state = stateCode === SHOP.stateCode ? SHOP.state : "";
+/** A signed ledger line. `debit` decides both the flag and the sign. */
+function entry(name: string, value: number, debit: boolean): string {
+  if (!value) return "";
+  return `        <ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>${esc(name)}</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>${debit ? "Yes" : "No"}</ISDEEMEDPOSITIVE>
+          <AMOUNT>${debit ? "-" : ""}${amt(value)}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>\n`;
+}
+
+function ledgerMaster(name: string, gstin: string | null, parent: string, state: string): string {
   return `    <TALLYMESSAGE xmlns:UDF="TallyUDF">
       <LEDGER NAME="${esc(name)}" ACTION="Create">
         <NAME>${esc(name)}</NAME>
-        <PARENT>Sundry Debtors</PARENT>
+        <PARENT>${esc(parent)}</PARENT>
         <ISBILLWISEON>Yes</ISBILLWISEON>
         <AFFECTSSTOCK>No</AFFECTSSTOCK>
 ${gstin ? `        <PARTYGSTIN>${esc(gstin)}</PARTYGSTIN>\n        <GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE>\n` : ""}${state ? `        <LEDSTATENAME>${esc(state)}</LEDSTATENAME>\n` : ""}      </LEDGER>
@@ -40,8 +55,13 @@ ${gstin ? `        <PARTYGSTIN>${esc(gstin)}</PARTYGSTIN>\n        <GSTREGISTRAT
 }
 
 function voucher(inv: ReviewInvoice): string {
+  const purchase = inv.direction === "purchase";
   const date = tallyDate(inv.extraction.invoiceDate);
-  const party = inv.partyLedgerName ?? inv.extraction.partyName;
+  const party =
+    inv.partyLedgerName ??
+    (purchase ? inv.extraction.supplierName : inv.extraction.partyName) ??
+    "";
+  const gstin = purchase ? inv.extraction.supplierGstin : inv.extraction.partyGstin;
   const intra = inv.computed.supply !== "inter";
 
   const taxable = round2(inv.lines.reduce((s, l) => s + l.amount, 0));
@@ -50,73 +70,83 @@ function voucher(inv: ReviewInvoice): string {
   const igst = round2(Number(inv.extraction.igst ?? 0));
   const roundOff = round2(Number(inv.extraction.roundOff ?? 0));
   const total = round2(taxable + cgst + sgst + igst + roundOff);
-  const salesLedger = intra ? TAX_LEDGERS.salesLocal : TAX_LEDGERS.salesInterstate;
+
+  const goodsLedger = purchase
+    ? intra
+      ? TAX_LEDGERS.purchaseLocal
+      : TAX_LEDGERS.purchaseInterstate
+    : intra
+      ? TAX_LEDGERS.salesLocal
+      : TAX_LEDGERS.salesInterstate;
+
+  // On a purchase the party is credited and everything else is debited.
+  const partyIsDebit = !purchase;
+  const goodsIsDebit = purchase;
 
   const inventory = inv.lines
     .map(
       (l) => `        <ALLINVENTORYENTRIES.LIST>
           <STOCKITEMNAME>${esc(l.stockItemName ?? l.description)}</STOCKITEMNAME>
-          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-          <ISLASTDEEMEDPOSITIVE>No</ISLASTDEEMEDPOSITIVE>
+          <ISDEEMEDPOSITIVE>${goodsIsDebit ? "Yes" : "No"}</ISDEEMEDPOSITIVE>
+          <ISLASTDEEMEDPOSITIVE>${goodsIsDebit ? "Yes" : "No"}</ISLASTDEEMEDPOSITIVE>
           <RATE>${amt(l.rate)}/${esc(l.unit ?? "PCS")}</RATE>
           <ACTUALQTY>${l.qty} ${esc(l.unit ?? "PCS")}</ACTUALQTY>
           <BILLEDQTY>${l.qty} ${esc(l.unit ?? "PCS")}</BILLEDQTY>
-          <AMOUNT>${amt(l.amount)}</AMOUNT>
+          <AMOUNT>${goodsIsDebit ? "-" : ""}${amt(l.amount)}</AMOUNT>
           <ACCOUNTINGALLOCATIONS.LIST>
-            <LEDGERNAME>${esc(salesLedger)}</LEDGERNAME>
-            <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-            <AMOUNT>${amt(l.amount)}</AMOUNT>
+            <LEDGERNAME>${esc(goodsLedger)}</LEDGERNAME>
+            <ISDEEMEDPOSITIVE>${goodsIsDebit ? "Yes" : "No"}</ISDEEMEDPOSITIVE>
+            <AMOUNT>${goodsIsDebit ? "-" : ""}${amt(l.amount)}</AMOUNT>
           </ACCOUNTINGALLOCATIONS.LIST>
         </ALLINVENTORYENTRIES.LIST>`,
     )
     .join("\n");
 
-  const taxEntry = (name: string, value: number) =>
-    value === 0
-      ? ""
-      : `        <ALLLEDGERENTRIES.LIST>
-          <LEDGERNAME>${esc(name)}</LEDGERNAME>
-          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-          <AMOUNT>${amt(value)}</AMOUNT>
-        </ALLLEDGERENTRIES.LIST>\n`;
+  const taxLines = intra
+    ? entry(purchase ? TAX_LEDGERS.inputCgst : TAX_LEDGERS.cgst, cgst, goodsIsDebit) +
+      entry(purchase ? TAX_LEDGERS.inputSgst : TAX_LEDGERS.sgst, sgst, goodsIsDebit)
+    : entry(purchase ? TAX_LEDGERS.inputIgst : TAX_LEDGERS.igst, igst, goodsIsDebit);
 
   return `    <TALLYMESSAGE xmlns:UDF="TallyUDF">
-      <VOUCHER VCHTYPE="Sales" ACTION="Create" OBJVIEW="Invoice Voucher View">
+      <VOUCHER VCHTYPE="${purchase ? "Purchase" : "Sales"}" ACTION="Create" OBJVIEW="Invoice Voucher View">
         <DATE>${date}</DATE>
         <EFFECTIVEDATE>${date}</EFFECTIVEDATE>
-        <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+        <VOUCHERTYPENAME>${purchase ? "Purchase" : "Sales"}</VOUCHERTYPENAME>
         <VOUCHERNUMBER>${esc(inv.extraction.invoiceNumber)}</VOUCHERNUMBER>
         <REFERENCE>${esc(inv.extraction.invoiceNumber)}</REFERENCE>
         <REFERENCEDATE>${date}</REFERENCEDATE>
         <PARTYLEDGERNAME>${esc(party)}</PARTYLEDGERNAME>
         <PARTYNAME>${esc(party)}</PARTYNAME>
-${inv.extraction.partyGstin ? `        <PARTYGSTIN>${esc(inv.extraction.partyGstin)}</PARTYGSTIN>\n` : ""}        <PLACEOFSUPPLY>${esc(intra ? SHOP.state : "Interstate")}</PLACEOFSUPPLY>
+${gstin ? `        <PARTYGSTIN>${esc(gstin)}</PARTYGSTIN>\n` : ""}        <PLACEOFSUPPLY>${esc(intra ? SHOP.state : "Interstate")}</PLACEOFSUPPLY>
         <PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW>
         <ISINVOICE>Yes</ISINVOICE>
         <ALLLEDGERENTRIES.LIST>
           <LEDGERNAME>${esc(party)}</LEDGERNAME>
-          <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-          <AMOUNT>-${amt(total)}</AMOUNT>
+          <ISDEEMEDPOSITIVE>${partyIsDebit ? "Yes" : "No"}</ISDEEMEDPOSITIVE>
+          <AMOUNT>${partyIsDebit ? "-" : ""}${amt(total)}</AMOUNT>
           <BILLALLOCATIONS.LIST>
             <NAME>${esc(inv.extraction.invoiceNumber)}</NAME>
             <BILLTYPE>New Ref</BILLTYPE>
-            <AMOUNT>-${amt(total)}</AMOUNT>
+            <AMOUNT>${partyIsDebit ? "-" : ""}${amt(total)}</AMOUNT>
           </BILLALLOCATIONS.LIST>
         </ALLLEDGERENTRIES.LIST>
-${intra ? taxEntry(TAX_LEDGERS.cgst, cgst) + taxEntry(TAX_LEDGERS.sgst, sgst) : taxEntry(TAX_LEDGERS.igst, igst)}${taxEntry(TAX_LEDGERS.roundOff, roundOff)}${inventory}
+${taxLines}${entry(TAX_LEDGERS.roundOff, roundOff, goodsIsDebit)}${inventory}
       </VOUCHER>
     </TALLYMESSAGE>`;
 }
 
 export function buildTallyXml(invoices: ReviewInvoice[], newLedgers: ReviewInvoice[] = []): string {
-  const masters = newLedgers.map((inv) =>
-    ledgerMaster(
-      inv.partyLedgerName ?? inv.extraction.partyName,
-      inv.extraction.partyGstin ?? null,
-      (inv.extraction.partyGstin ?? "").slice(0, 2) || SHOP.stateCode,
-    ),
-  );
-  const vouchers = invoices.map(voucher);
+  const masters = newLedgers.map((inv) => {
+    const purchase = inv.direction === "purchase";
+    const gstin = (purchase ? inv.extraction.supplierGstin : inv.extraction.partyGstin) ?? null;
+    const code = (gstin ?? "").slice(0, 2) || SHOP.stateCode;
+    return ledgerMaster(
+      inv.partyLedgerName ?? "",
+      gstin,
+      purchase ? "Sundry Creditors" : "Sundry Debtors",
+      code === SHOP.stateCode ? SHOP.state : "",
+    );
+  });
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <ENVELOPE>
@@ -132,7 +162,7 @@ export function buildTallyXml(invoices: ReviewInvoice[], newLedgers: ReviewInvoi
         </STATICVARIABLES>
       </REQUESTDESC>
       <REQUESTDATA>
-${[...masters, ...vouchers].join("\n")}
+${[...masters, ...invoices.map(voucher)].join("\n")}
       </REQUESTDATA>
     </IMPORTDATA>
   </BODY>

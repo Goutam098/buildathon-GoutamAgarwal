@@ -66,6 +66,7 @@ export type Overrides = {
 export type ReviewInvoice = {
   id: string;
   fileName: string;
+  direction: "sales" | "purchase";
   overrides?: Overrides;
   isNewLedger?: boolean;
   imageUrl?: string;
@@ -79,6 +80,7 @@ export type ReviewInvoice = {
   computed: Computed;
   status: "ready" | "review";
   approved?: boolean;
+  cancelled?: boolean;
   extractionMs?: number;
   source?: "live" | "cached" | "counter";
 };

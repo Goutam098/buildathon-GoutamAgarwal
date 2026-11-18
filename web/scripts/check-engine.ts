@@ -72,7 +72,7 @@ const BILL_2: ExtractedInvoice = {
 };
 
 const mk = (e: ExtractedInvoice, id: string, overrides = {}) =>
-  buildInvoice(e, { id, fileName: `${id}.png`, stock, seenInvoiceNumbers: [], overrides });
+  buildInvoice(e, { id, fileName: `${id}.png`, stock, seenInvoiceNumbers: [], direction: "sales", overrides });
 
 /* --- 1. the clean bill -------------------------------------------------- */
 console.log("\nClean bill posts straight through");

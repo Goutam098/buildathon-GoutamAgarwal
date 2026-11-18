@@ -56,7 +56,15 @@ export const LEDGERS: Ledger[] = [
   { id: "LD-004", name: "Rajasthan Crockery Depot", aliases: ["rajasthan crockery"], gstin: "08DEFGH1357M1Z7", group: "Sundry Debtors", stateCode: "08" },
   { id: "LD-005", name: "Bhandari Kitchen World", aliases: ["bhandari kitchen"], gstin: "08BCDEF8642N1Z1", group: "Sundry Debtors", stateCode: "08" },
   { id: "LD-006", name: "Agarwal Utensils Mart", aliases: ["agarwal utensils"], gstin: "09ABCDE9753Q1Z8", group: "Sundry Debtors", stateCode: "09" },
+
+  // Suppliers. Purchase bills are matched against these, never against customers.
+  { id: "LD-101", name: "Jindal Steel Udyog", aliases: ["jindal udyog", "jindal steel"], gstin: "08JKLMN3579S1Z2", group: "Sundry Creditors", stateCode: "08" },
+  { id: "LD-102", name: "Suraj Metal Works", aliases: ["suraj metals"], gstin: "08SURAJ2468T1Z6", group: "Sundry Creditors", stateCode: "08" },
+  { id: "LD-103", name: "Hindustan Kitchenware Co", aliases: ["hindustan kitchenware"], gstin: "24HINDU1593U1Z4", group: "Sundry Creditors", stateCode: "24" },
 ];
+
+export const DEBTORS = LEDGERS.filter((l) => l.group === "Sundry Debtors");
+export const CREDITORS = LEDGERS.filter((l) => l.group === "Sundry Creditors");
 
 /** Accounting ledgers the sales voucher posts against. */
 export const TAX_LEDGERS = {
@@ -65,6 +73,11 @@ export const TAX_LEDGERS = {
   cgst: "Output CGST 2.5%",
   sgst: "Output SGST 2.5%",
   igst: "Output IGST 5%",
+  purchaseLocal: "Purchase - Local 5%",
+  purchaseInterstate: "Purchase - Interstate 5%",
+  inputCgst: "Input CGST 2.5%",
+  inputSgst: "Input SGST 2.5%",
+  inputIgst: "Input IGST 5%",
   roundOff: "Round Off",
 } as const;
 

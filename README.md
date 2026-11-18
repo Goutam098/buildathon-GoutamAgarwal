@@ -2,11 +2,17 @@
 
 **Track 1 — Build for the Physical World** · Buildathon, Masters' Union, 18 Nov 2026
 
-Paper bills arrive with the goods. Every night, after the shutter comes down, somebody
-retypes them into Tally. Overnight Books reads the photographs instead, matches every
-line against the shop's **own** ledgers and stock items, re-does the bill's arithmetic,
-and hands back a Tally import file — flagging anything it is not sure about rather than
-guessing at it.
+Every night, after the shutter comes down, somebody retypes the day's bills into Tally.
+
+**Half of that paper should never have existed.** If the shop rings up its own sales on a
+screen, the sale is born digital — there is nothing to transcribe and nothing to get
+wrong. **The other half arrives from outside**, on the supplier's paper, in the supplier's
+format, and no amount of owning your own billing will ever fix it. That half gets
+photographed, read, matched against the shop's **own** ledgers and stock items, and
+checked against its own arithmetic, with anything uncertain flagged rather than guessed
+at.
+
+Overnight Books does both, and posts the same Tally voucher either way.
 
 ---
 
@@ -31,6 +37,21 @@ Knowing which of *this shop's* 400 stock items a smudged line refers to is the j
 - Every bill is different: printed, handwritten, thermal, a WhatsApp forward.
 - Staff who type fast are cheap, so owners absorb the cost rather than fix it.
 - A wrong entry is worse than no entry — so people do it carefully, which means slowly.
+
+### Two kinds of paper
+
+It is tempting to treat this as one OCR problem. It is not, and the split is the whole
+design:
+
+| | Sales bills | Purchase bills |
+|---|---|---|
+| Who creates them | The shop | The supplier |
+| Can you own the moment of creation? | **Yes** | **Never** |
+| Right answer | Rng it up digitally. No transcription step exists. | Read the paper, match it, check it, flag what is doubtful. |
+| Error rate | Zero, structurally | Whatever your matching is worth |
+
+So we do not photograph our own sales. We stop producing the paper. We only point a
+camera at the paper we did not get a vote on.
 
 ## How big this is
 

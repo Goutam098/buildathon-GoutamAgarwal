@@ -10,6 +10,7 @@ import type { ReviewInvoice } from "./types";
 export type PostedLine = { stockItemId: string; name: string; qty: number; amount: number };
 export type PostedInvoice = {
   id: string;
+  direction: "sales" | "purchase";
   invoiceNumber: string;
   invoiceDate: string;
   party: string;

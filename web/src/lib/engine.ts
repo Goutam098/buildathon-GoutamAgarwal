@@ -12,7 +12,9 @@
 
 import {
   AUTO_ACCEPT,
-  LEDGERS,
+  CREDITORS,
+  DEBTORS,
+
   REVIEW_FLOOR,
   SHOP,
   STOCK_ITEMS,
@@ -197,14 +199,24 @@ export function resolveInvoice(
     imageUrl?: string;
     stock: Record<string, number>;
     seenInvoiceNumbers: string[];
+    /** Sales leave the shop; purchases arrive. It changes who the counterparty
+     *  is on the paper, which ledger group to search, and which way stock moves. */
+    direction: "sales" | "purchase";
   },
 ): ReviewInvoice {
   const flags: Flag[] = [];
+  const isPurchase = opts.direction === "purchase";
 
   /* ---- party -------------------------------------------------- */
-  const gstin = (extraction.partyGstin || "").toUpperCase().replace(/\s/g, "");
-  const byGstin = gstin ? LEDGERS.find((l) => l.gstin === gstin) : undefined;
-  const ranked = rank(extraction.partyName || "", LEDGERS as unknown as Named[]) as {
+  // On a bill we issued, the counterparty is who it is billed TO. On a bill a
+  // supplier issued us, the counterparty is whoever issued it.
+  const partyName = (isPurchase ? extraction.supplierName : extraction.partyName) || "";
+  const rawGstin = isPurchase ? extraction.supplierGstin : extraction.partyGstin;
+
+  const gstin = (rawGstin || "").toUpperCase().replace(/\s/g, "");
+  const pool = isPurchase ? CREDITORS : DEBTORS;
+  const byGstin = gstin ? pool.find((l) => l.gstin === gstin) : undefined;
+  const ranked = rank(partyName, pool as unknown as Named[]) as {
     item: Ledger;
     score: number;
   }[];
@@ -229,8 +241,8 @@ export function resolveInvoice(
       scope: "party",
       message:
         partyScore >= REVIEW_FLOOR
-          ? `"${extraction.partyName}" is not an exact ledger. Closest is "${top.item.name}" (${Math.round(partyScore * 100)}%). Confirm or create the ledger.`
-          : `"${extraction.partyName}" has no ledger in Tally. Create it before posting.`,
+          ? `"${partyName}" is not an exact ledger. Closest is "${top.item.name}" (${Math.round(partyScore * 100)}%). Confirm or create the ledger.`
+          : `"${partyName}" has no ledger in Tally. Create it before posting.`,
     });
   }
 
@@ -289,7 +301,7 @@ export function resolveInvoice(
     }
 
     const availableQty = accepted ? (opts.stock[accepted.id] ?? 0) : null;
-    if (accepted && availableQty !== null && qty > availableQty) {
+    if (!isPurchase && accepted && availableQty !== null && qty > availableQty) {
       flags.push({
         code: "INSUFFICIENT_STOCK",
         severity: "warn",
@@ -431,6 +443,7 @@ export function resolveInvoice(
   return {
     id: opts.id,
     fileName: opts.fileName,
+    direction: opts.direction,
     imageUrl: opts.imageUrl,
     extraction,
     partyLedgerId: partyLedger?.id ?? null,
@@ -444,22 +457,3 @@ export function resolveInvoice(
   };
 }
 
-/** Re-run every check after a human edits a match. Nothing is trusted twice. */
-export function revalidate(
-  inv: ReviewInvoice,
-  stock: Record<string, number>,
-  seen: string[],
-): ReviewInvoice {
-  const patched: ExtractedInvoice = { ...inv.extraction };
-  const next = resolveInvoice(patched, {
-    id: inv.id,
-    fileName: inv.fileName,
-    imageUrl: inv.imageUrl,
-    stock,
-    seenInvoiceNumbers: seen,
-  });
-  // keep human decisions
-  next.partyLedgerId = inv.partyLedgerId ?? next.partyLedgerId;
-  next.partyLedgerName = inv.partyLedgerName ?? next.partyLedgerName;
-  return next;
-}

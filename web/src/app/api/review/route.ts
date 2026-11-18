@@ -32,6 +32,7 @@ export async function POST(req: Request) {
     imageUrl: current.imageUrl,
     stock: db.stock,
     seenInvoiceNumbers: seenInvoiceNumbers(db),
+    direction: current.direction,
     overrides: merged,
     extractionMs: current.extractionMs,
     source: current.source,

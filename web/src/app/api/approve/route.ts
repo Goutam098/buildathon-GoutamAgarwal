@@ -6,8 +6,12 @@ import { round2 } from "@/lib/engine";
 export const runtime = "nodejs";
 
 /**
- * Approving is the only thing that touches stock. Nothing before this point
- * has changed a single number in the shop's position.
+ * Approving is the only thing that touches stock. Nothing before this point has
+ * changed a single number in the shop's position.
+ *
+ * Sales take stock out. Approved purchases put it in. Same engine, same review
+ * screen, opposite sign — which is the whole point of doing both halves in one
+ * system instead of two.
  */
 export async function POST(req: Request) {
   const { ids } = (await req.json()) as { ids: string[] };
@@ -26,15 +30,22 @@ export async function POST(req: Request) {
       refused.push({ id, reason: "Still has unresolved errors." });
       continue;
     }
+    // Posting the same document twice would double both the money and the stock.
     if (inv.approved) {
       refused.push({ id, reason: "Already posted." });
       continue;
     }
+    const key = (inv.extraction.invoiceNumber || "").toUpperCase();
+    if (key && db.posted.some((p) => p.invoiceNumber.toUpperCase() === key && !p.id.startsWith("void-"))) {
+      refused.push({ id, reason: `Voucher ${inv.extraction.invoiceNumber} is already posted.` });
+      continue;
+    }
 
+    const sign = inv.direction === "purchase" ? 1 : -1;
     const lines: PostedLine[] = [];
     for (const l of inv.lines) {
       if (!l.stockItemId) continue;
-      db.stock[l.stockItemId] = round2((db.stock[l.stockItemId] ?? 0) - l.qty);
+      db.stock[l.stockItemId] = round2((db.stock[l.stockItemId] ?? 0) + sign * l.qty);
       lines.push({
         stockItemId: l.stockItemId,
         name: l.stockItemName ?? l.description,
@@ -46,6 +57,7 @@ export async function POST(req: Request) {
     inv.approved = true;
     db.posted.push({
       id: inv.id,
+      direction: inv.direction,
       invoiceNumber: inv.extraction.invoiceNumber,
       invoiceDate: inv.extraction.invoiceDate,
       party: inv.partyLedgerName ?? inv.extraction.partyName,
